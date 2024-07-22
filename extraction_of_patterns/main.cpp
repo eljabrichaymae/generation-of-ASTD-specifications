@@ -19,10 +19,6 @@ extern "C" {
     #include "stree_ukkonen.h"
     #include "repeats_supermax.h"
     #include "repeats_primitives.h"
-    //#include "repeats_tandem.h"
-    #include "repeats_linear_occs.h"
-    #include "stree_decomposition.h"
-    #include "repeats_vocabulary.h"
 }
 
 int cpt = 0;
