@@ -1,0 +1,33 @@
+[
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "gcc -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_strmat.c -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_strmat.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_strmat.c"
+    },
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "gcc -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_supermax.c -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_supermax.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_supermax.c"
+    },
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "gcc -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_primitives.c -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_primitives.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_primitives.c"
+    },
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "gcc -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_tandem.c -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_tandem.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/repeats_tandem.c"
+    },
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "gcc -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_ukkonen.c -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_ukkonen.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/stree_ukkonen.c"
+    },
+    {
+      "directory": "/Users/eljabrichaymae/Downloads/max_repeats/strmat",
+      "command": "g++ -std=c++17 -c /Users/eljabrichaymae/Downloads/max_repeats/strmat/main.cpp -o /Users/eljabrichaymae/Downloads/max_repeats/strmat/main.o",
+      "file": "/Users/eljabrichaymae/Downloads/max_repeats/strmat/main.cpp"
+    }
+  ]
+  
