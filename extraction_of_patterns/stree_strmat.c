@@ -54,8 +54,8 @@ SUFFIX_TREE stree_new_tree(int alphasize, int copyflag,
 {
   SUFFIX_TREE tree;
 
-  if (alphasize <= 0 || alphasize > 128)
-    return NULL;
+  // if (alphasize <= 0 || alphasize > 128)
+  //   return NULL;
 
   if ((build_type != LINKED_LIST && build_type != SORTED_LIST &&
        build_type != LIST_THEN_ARRAY && build_type != COMPLETE_ARRAY) ||
@@ -714,14 +714,14 @@ int int_stree_insert_string(SUFFIX_TREE tree, int *S, int *Sraw,
 
   if (tree->nextslot == tree->strsize) {
     if (tree->strsize == 0) {
-      tree->strsize = 128;
+      tree->strsize = 400;
       if ((tree->strings = malloc(tree->strsize * sizeof(int *))) == NULL ||
           (tree->rawstrings = malloc(tree->strsize * sizeof(int *))) == NULL)
         return -1;
       if ((tree->lengths = malloc(tree->strsize * sizeof(int))) == NULL ||
           (tree->ids = malloc(tree->strsize * sizeof(int))) == NULL)
         return -1;
-      for (i=0; i < 128; i++) {
+      for (i=0; i < 400; i++) {
         tree->strings[i] = tree->rawstrings[i] = NULL;
         tree->lengths[i] = tree->ids[i] = 0;
       }

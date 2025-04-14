@@ -6,11 +6,11 @@
 #include "stree_strmat.h"
 
 
-#define IDENT_LENGTH 50
-#define TITLE_LENGTH 200
+#define IDENT_LENGTH 500
+#define TITLE_LENGTH 2000
 
 typedef struct {
-  int sequence[1000], desc_string[1000], raw_seq[1000];
+  int sequence[1000000], desc_string[1000000], raw_seq[1000000];
   int length, alphabet, raw_alpha, db_type;
   int alpha_size;
   int ident[IDENT_LENGTH+1], title[TITLE_LENGTH+1];

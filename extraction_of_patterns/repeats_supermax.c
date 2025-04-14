@@ -176,6 +176,10 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
                                       int min_percent, int min_length,
                                       SUPERMAXIMALS list);
 
+static SUPERMAXIMALS compute_supermax1(SUFFIX_TREE tree, STREE_NODE node,
+                                      int min_percent, int min_length,
+                                      SUPERMAXIMALS list);
+
 static SUPERMAXIMALS compute_max(SUFFIX_TREE tree, STREE_NODE node,
                                       int min_percent, SUPERMAXIMALS list);
 
@@ -206,7 +210,7 @@ SUPERMAXIMALS supermax_find(int *S, int M, int min_percent, int min_length)
    * Build the suffix tree and allocate everything.
    */
 //#ifdef STRMAT
-  if ((tree = stree_new_tree(128, 0, SORTED_LIST, 0)) == NULL)
+  if ((tree = stree_new_tree(400, 0, SORTED_LIST, 0)) == NULL)
     return NULL;
 
   if (stree_ukkonen_add_string(tree, S, S, M, 1) <= 0) {
@@ -214,7 +218,7 @@ SUPERMAXIMALS supermax_find(int *S, int M, int min_percent, int min_length)
     return NULL;
   }
 //#else
-//   if ((tree = stree_new_tree(128, 0)) == NULL)
+//   if ((tree = stree_new_tree(400, 0)) == NULL)
 //     return NULL;
 
 //   if (stree_ukkonen_add_string(tree, S, M, 1) <= 0) {
@@ -236,7 +240,7 @@ SUPERMAXIMALS supermax_find(int *S, int M, int min_percent, int min_length)
     list = compute_max(tree, stree_get_root(tree), min_length,
                         NULL);
   else
-    list = compute_supermax(tree, stree_get_root(tree), min_percent, min_length,
+    list = compute_supermax1(tree, stree_get_root(tree), min_percent, min_length,
                           NULL);
 
 
@@ -284,6 +288,9 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
     return NULL;
 
   id = stree_get_ident(tree, node);
+  printf("id : %d\n", id);
+
+
 
   /*
    * Recurse on the children, computing the numbers of left predecessors
@@ -315,7 +322,7 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
    * Add in the left predecessors of any leaves of the current node.
    */
   for (i=1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++)
-    lvals_add_value(id, (pos == 0 ? 128 : str[pos-1]), 1);
+    lvals_add_value(id, (pos == 0 ? 400 : str[pos-1]), 1);
 
   /*
    * Determine if the current node is a supermaximal or near supermaximal.
@@ -347,14 +354,14 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
     if (stree_get_num_children(tree, child) == 0 &&
         stree_get_num_leaves(tree, child) > 0) {
       for (i=1; stree_get_leaf(tree, child, i, &str, &pos, &index); i++)
-        if (lvals_get_value(id, (pos == 0 ? 128 : str[pos-1])) == 1)
+        if (lvals_get_value(id, (pos == 0 ? 400 : str[pos-1])) == 1)
           witnesses++;
     }
     child = stree_get_next(tree, child);
   }
 
   for (i=1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++)
-    if (lvals_get_value(id, (pos == 0 ? 128 : str[pos-1])) == 1)
+    if (lvals_get_value(id, (pos == 0 ? 400 : str[pos-1])) == 1)
       witnesses++;
 
   if (witnesses == 0)
@@ -385,6 +392,17 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
     newnode->num_leaves = num_leaves;
     newnode->num_witness = witnesses;
     newnode->percent = percent;
+    printf("percent : %d",percent);
+    // Collect start indices of the leaves
+    newnode->num_start_indices = num_leaves;
+    newnode->start_indices = malloc(num_leaves * sizeof(int));
+    int idx = 0;
+
+    for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++) {
+      printf("indices : %d",pos);
+      newnode->start_indices[idx++] = pos;
+    }
+
     newnode->next = list;
     list = newnode;
   }
@@ -392,6 +410,146 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
   return list;
 }
 
+
+static SUPERMAXIMALS compute_supermax1(SUFFIX_TREE tree, STREE_NODE node,
+                                      int min_percent, int min_length,
+                                      SUPERMAXIMALS list)
+{
+    static int errorflag;
+    int i, id, pos, index, num_leaves, diversity, witnesses, percent;
+    int *str;
+    STREE_NODE child;
+    LEFTVALS lvalnode;
+    SUPERMAXIMALS newnode, smnode;
+
+    if (node == stree_get_root(tree))
+        errorflag = 0;
+
+    if (errorflag)
+        return NULL;
+
+    id = stree_get_ident(tree, node);
+
+    // Recurse on the children
+    child = stree_get_children(tree, node);
+    while (child != NULL) {
+        list = compute_supermax1(tree, child, min_percent, min_length, list);
+        if (errorflag)
+            return NULL;
+
+        lvalnode = stack[stree_get_ident(tree, child)];
+        while (lvalnode != NULL) {
+            lvals_add_value(id, lvalnode->value, lvalnode->count);
+            lvalnode = lvalnode->next;
+        }
+
+        child = stree_get_next(tree, child);
+    }
+
+    if (node == stree_get_root(tree))
+        return list;
+
+    // Add in the left predecessors of any leaves of the current node
+    for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++)
+        lvals_add_value(id, (pos == 0 ? 400 : str[pos - 1]), 1);
+
+    // Determine if the current node is a supermaximal or near supermaximal
+    num_leaves = 0;
+    diversity = 0;
+    for (lvalnode = stack[id]; lvalnode != NULL; lvalnode = lvalnode->next) {
+        num_leaves += lvalnode->count;
+        diversity++;
+    }
+
+    if (diversity == 1)
+        return list;
+
+    // Find the number of witnesses
+    witnesses = 0;
+    child = stree_get_children(tree, node);
+    while (child != NULL) {
+        if (stree_get_num_children(tree, child) == 0 &&
+            stree_get_num_leaves(tree, child) > 0) {
+            for (i = 1; stree_get_leaf(tree, child, i, &str, &pos, &index); i++) {
+                if (lvals_get_value(id, (pos == 0 ? 400 : str[pos - 1])) == 1) {
+                    witnesses++;
+                }
+            }
+        }
+        child = stree_get_next(tree, child);
+    }
+
+    for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++) {
+        if (lvals_get_value(id, (pos == 0 ? 400 : str[pos - 1])) == 1) {
+            witnesses++;
+        }
+    }
+
+    if (witnesses == 0)
+        return list;
+
+    // Check whether the node is sufficiently a near supermaximal
+    percent = (int)(((float)witnesses) / ((float)num_leaves) * 100.0);
+
+    if (min_percent == 0 || (min_percent < 100 && percent >= min_percent) ||
+        (min_percent == 100 && witnesses == num_leaves)) {
+
+        newnode = (SUPERMAXIMALS)malloc(sizeof(STRUCT_SUPERMAX));
+        if (newnode == NULL) {
+            errorflag = 1;
+            while (list != NULL) {
+                smnode = list;
+                list = list->next;
+                free(smnode->start_indices);
+                free(smnode);
+            }
+            return NULL;
+        }
+
+        newnode->M = stree_get_labellen(tree, node);
+        newnode->S = stree_get_edgestr(tree, node) +
+                      (stree_get_edgelen(tree, node) - newnode->M);
+        newnode->num_leaves = num_leaves;
+        //printf("num_leaves: %d\n",newnode->num_leaves);
+        newnode->num_witness = witnesses;
+        newnode->percent = percent;
+        newnode->next = list;
+
+        // Allocate memory for indices
+        newnode->start_indices = (int *)malloc(num_leaves * sizeof(int));
+        if (newnode->start_indices == NULL) {
+            free(newnode);
+            errorflag = 1;
+            while (list != NULL) {
+                smnode = list;
+                list = list->next;
+                free(smnode->start_indices);
+                free(smnode);
+            }
+            return NULL;
+        }
+        newnode->num_start_indices = 0;
+
+        // Collect the indices of the leaves
+        for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++) {
+            newnode->start_indices[newnode->num_start_indices++] = pos;
+            //printf("Node index: %d, pos: %d, str: %d\n", index, pos, (pos > 0 ? str[pos - 1] : -1));
+        }
+
+        // Collect the indices of the leaves in the children
+        child = stree_get_children(tree, node);
+        while (child != NULL) {
+            for (i = 1; stree_get_leaf(tree, child, i, &str, &pos, &index); i++) {
+                newnode->start_indices[newnode->num_start_indices++] = pos+1;
+                //printf("Child index: %d, pos: %d, str: %d\n", index, pos+1, (pos > 0 ? str[pos] : -1));
+            }
+            child = stree_get_next(tree, child);
+        }
+
+        list = newnode;
+    }
+    return list;
+}
 
 
 
@@ -448,7 +606,7 @@ static SUPERMAXIMALS compute_max(SUFFIX_TREE tree, STREE_NODE node,
    * Add in the left predecessors of any leaves of the current node.
    */
   for (i=1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++)
-    lvals_add_value(id, (pos == 0 ? 128 : str[pos-1]), 1);
+    lvals_add_value(id, (pos == 0 ? 400 : str[pos-1]), 1);
 
   /*
    * Determine if the current node is a supermaximal or near supermaximal.

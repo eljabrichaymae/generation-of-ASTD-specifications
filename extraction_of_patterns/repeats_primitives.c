@@ -92,13 +92,13 @@ int compare_sequences(int* seq1, int len1, int* seq2, int len2) {
 }
 
 
-// Fonction pour afficher une séquence
-void print_sequence(const int* sequence, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        printf("%d ", sequence[i]);
-    }
-    printf("\n"); // Pour aller à la ligne après avoir imprimé la séquence
-}
+// // Fonction pour afficher une séquence
+// void print_sequence(const int* sequence, size_t length) {
+//     for (size_t i = 0; i < length; i++) {
+//         printf("%d ", sequence[i]);
+//     }
+//     printf("\n"); // Pour aller à la ligne après avoir imprimé la séquence
+// }
 
 
 void group_and_verify_tandem_repeats(const int *sequence) {
@@ -116,7 +116,7 @@ void group_and_verify_tandem_repeats(const int *sequence) {
                 exit(EXIT_FAILURE);
             }
             // Copy the sequence using memcpy
-            memcpy(current->triplet.sequence, sequence + current->triplet.start, current->triplet.length * sizeof(int));
+            memcpy(current->triplet.sequence, sequence + current->triplet.start-1, current->triplet.length * sizeof(int));
         }
 
         TripletNode *next_node = current->next;
@@ -132,13 +132,20 @@ void group_and_verify_tandem_repeats(const int *sequence) {
                 fprintf(stderr, "Memory allocation for next sequence failed\n");
                 exit(EXIT_FAILURE);
             }
-            memcpy(next_sequence, sequence + next_node->triplet.start, next_node->triplet.length * sizeof(int));
+            memcpy(next_sequence, sequence + next_node->triplet.start-1, next_node->triplet.length * sizeof(int));
             
             
             int current_end = current->triplet.start + (current->triplet.length * current->triplet.iteration);
             int next_end = next_node->triplet.start + (next_node->triplet.length * next_node->triplet.iteration);
             int current_start = current->triplet.start;
             int next_start = next_node->triplet.start;
+
+            //printf("current_start: %d\n", current_start);
+            //printf("next_start: %d\n", next_start);
+            //printf("current_sequence: \n");
+            //print_sequence(current_sequence,current->triplet.length);
+            //printf("next_sequence: \n");
+            //print_sequence(next_sequence,next_node->triplet.length);
             
             if (current_end >= next_start && current->triplet.length == next_node->triplet.length &&
                 are_circular_permutations(current_sequence, current->triplet.length, next_sequence, next_node->triplet.length)) {
@@ -185,7 +192,7 @@ void fusion_of_overlapping_repeats() {
             int current_start = prev_next_node->triplet.start;
             
                 if (current_end > next_start 
-                //is_circular_shift(prev_next_node->triplet.sequence, next_node->triplet.sequence, prev_next_node->triplet.length)
+                //&& is_circular_shift(prev_next_node->triplet.sequence, next_node->triplet.sequence, prev_next_node->triplet.length)
                 ) {
 
                 if (next_end - current_end <= prev_next_node->triplet.length || next_end - current_end < 0) {
@@ -683,14 +690,14 @@ void primitives_free(primitives_struct *p)
 void pr_write(int *raw_string, int pos, int len, int rep, int *type)
 {
   int i, textlen, restlen;
-  int *s, *t, buffer[77];
+  int *s, *t, buffer[1000];
 
-  sprintf(buffer,"%s: (%d,%d,%d) ",type,pos+1,len,rep);
+  printf(buffer,"%s: (%d,%d,%d) ",type,pos+1,len,rep);
   //add_triplet(pos+1,len,rep);
-  buffer[76] = '\0';
+  buffer[1000] = '\0';
 
   textlen = strlen(buffer);
-  restlen = 76-textlen;
+  restlen = 1000-textlen;
   for(i=0,s=&buffer[textlen],t=&raw_string[pos];
       i<restlen && i<len*rep;
       i++,s++,t++)
@@ -735,8 +742,8 @@ void pr_report(primitives_struct *p, int iteration) {
 
                       int start = previous - p->entries;
                       int length = iteration;
-                      pr_write(p->raw_string, previous - p->entries, iteration, 2, 
-                              "primitive tandem repeat");
+                    // pr_write(p->raw_string, previous - p->entries, iteration, 2, 
+                    //        "primitive tandem repeat");
                       add_triplet(start + 1, length, 2);
                       p->num_primitive_tandem_repeat_occs++;  
                     }
@@ -749,23 +756,23 @@ void pr_report(primitives_struct *p, int iteration) {
 
 
 
-void print_triplets() {
-    TripletNode *current = triplet_list_head;
-    while (current != NULL) {
-        printf("(%d,%d,%d, [", 
-               current->triplet.start, 
-               current->triplet.length, 
-               current->triplet.iteration);
-        if (current->triplet.sequence != NULL) {
-            for (int i = 0; i < current->triplet.length; i++) {
-                if (i > 0) printf(", ");
-                printf("%d", current->triplet.sequence[i]);
-            }
-        }
-        printf("])\n");
-        current = current->next;
-    }
-}
+// void print_triplets() {
+//     TripletNode *current = triplet_list_head;
+//     while (current != NULL) {
+//         printf("(%d,%d,%d, [", 
+//                current->triplet.start, 
+//                current->triplet.length, 
+//                current->triplet.iteration);
+//         if (current->triplet.sequence != NULL) {
+//             for (int i = 0; i < current->triplet.length; i++) {
+//                 if (i > 0) printf(", ");
+//                 printf("%d", current->triplet.sequence[i]);
+//             }
+//         }
+//         printf("])\n");
+//         current = current->next;
+//     }
+// }
 
 
 
@@ -783,10 +790,10 @@ void print_triplets() {
 void pr_create_basic_lists(primitives_struct *p)
 {
   int i,c;
-  pr_list *occ[CHAR_MAX+1];
+  pr_list *occ[10000+1];
   pr_node *n;
 
-  for(i=0; i<=CHAR_MAX; i++)
+  for(i=0; i<=10000; i++)
     occ[i] = NULL;
 
   n = pr_new_node(p);
@@ -818,77 +825,101 @@ void primitives_find(primitives_struct *p)
   pr_entry *e,*ee;
   int i, maxlistlen, pos;
 
+  // printf("Début de primitives_find\n");
+
   /* create basic lists */
+  // printf("Création des listes de base\n");
   pr_create_basic_lists(p);
 
   for(i=1; i<p->length && p->nodes!=NULL; i++) {
+    // printf("Itération i = %d, longueur = %d\n", i, p->length);
 
     /* report primitive repeats */
-    pr_report(p,i);
+    // printf("Reporting primitive repeats pour i = %d\n", i);
+    pr_report(p, i);
 
     /* step forward to next level */
+    // printf("Passage au niveau suivant\n");
     pr_next_level(p);
 
-    /* for each node of the previous level */
+    /* pour chaque noeud du niveau précédent */
     for(n=p->nodes2; n!=NULL; n=n_next) {
       n_next = n->next;
 
-      /* find big list */
+      // printf("Traitement du noeud à l'adresse %p\n", n);
+
+      /* trouver la plus grande liste */
       maxlistlen = 0;
-      for(l=n->lists; l!=NULL; l=l->next)
+      for(l=n->lists; l!=NULL; l=l->next) {
         if(l->len > maxlistlen) {
           maxlistlen = l->len;
           maxlist = l;
         }
+      }
+      // printf("Liste la plus grande trouvée avec longueur = %d\n", maxlistlen);
 
-      /* copy small lists/move big list (except singletons) */
+      /* copier les petites listes/déplacer la grande liste (sauf singletons) */
       for(l=n->lists; l!=NULL; l=l_next) {
         l_next = l->next;
-        if(l == maxlist)
+
+        if(l == maxlist) {
+          // printf("Suppression de la grande liste\n");
           pr_remove_list(l);
-        else
-          pr_replace_list(p,l);
-        if(l->len == 1)
-          l->entries->inList = NULL; /* mark entry removed */
-        else {
+        } else {
+          // printf("Remplacement d'une petite liste\n");
+          pr_replace_list(p, l);
+        }
+
+        if(l->len == 1) {
+          // printf("Marquage de l'entrée comme supprimée\n");
+          l->entries->inList = NULL;
+        } else {
+          // printf("Création d'un nouveau noeud pour la liste\n");
           new_n = pr_new_node(p);
-          pr_append_node(p,new_n);
-          pr_append_list(l,new_n);
+          pr_append_node(p, new_n);
+          pr_append_list(l, new_n);
         }
       } /* for l */
     } /* for n */
 
-    /* using the remaining (small) lists, pull entries out */
-    for(n=p->nodes2; n!=NULL; n=n->next)
-      for(l=n->lists; l!=NULL; l=l->next)
+    /* utiliser les listes restantes (petites) pour extraire des entrées */
+    for(n=p->nodes2; n!=NULL; n=n->next) {
+      for(l=n->lists; l!=NULL; l=l->next) {
         for(e=l->entries; e!=NULL; e=e->next) {
-          pos = e-p->entries2;
+          pos = e - p->entries2;
           if(pos != 0) {
             ee = &p->entries[pos-1];
             if(ee->inList != NULL) {
               nn = ee->inList->atNode;
               if(nn->last_source_list != l) {
-                pr_append_list(pr_new_list(p),nn);
+                //printf("Ajout d'une nouvelle liste\n");
+                pr_append_list(pr_new_list(p), nn);
                 nn->last_source_list = l;
               }
-              pr_move_entry(ee,nn->last);
+             // printf("Déplacement d'une entrée\n");
+              pr_move_entry(ee, nn->last);
             }
           }
 #ifdef STATS
           p->num_compares++;
 #endif
         }
+      }
+    }
 
-    /* remove entry length-iteration */
+    /* supprimer les entrées de longueur itération */
+   // printf("Suppression de l'entrée pour la longueur itération %d\n", p->length-i);
     pr_remove_entry(&p->entries[p->length-i]);
 
 #ifdef STATS
     p->num_compares++;
 #endif
-
   } /* for i */
 
-} /* primitives_find() */
+ // printf("Fin de primitives_find\n");
+}
+
+/* primitives_find() */
 
 /****** EOF (repeats_primitives.c) *******************************************/
 
