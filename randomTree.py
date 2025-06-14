@@ -1,8 +1,31 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split, GridSearchCV  # ← MODIFICATION
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.tree import plot_tree
+import numpy as np
+import te2rules
+from te2rules.explainer import ModelExplainer
+from sklearn.tree import export_text
+from sklearn.tree import _tree
+import glob
+import re
+import os
+from sklearn.tree import DecisionTreeClassifier
 import json
 import re
 import glob
 from collections import defaultdict
 import math
+
+SEED = 42
+TEST_SIZE = 0.5
+RANDOM_STATES_TO_TEST = 42
+
+
 
 def constructDFA(P, alphabet):
     m = len(P)
@@ -120,11 +143,11 @@ def process_packer_rules(rules_directory, json_file):
             rule_info["global_condition"] = global_condition
 
             packer_rules.append(rule_info)
-            packer_conditions.append(f"({global_condition})")  # 👈 on l’ajoute ici
+            packer_conditions.append(f"({global_condition})")  # on l’ajoute ici
 
         rules_thresholds.extend(packer_rules)
 
-        # 👇 Créer la condition globale pour le packer (join avec ||)
+        # Créer la condition globale pour le packer (join avec ||)
         packer_global_conditions[packer_name] = " || ".join(packer_conditions)
 
     return rules_thresholds, packer_global_conditions, packer_var_names
@@ -173,14 +196,14 @@ def generate_astd_automaton_for_rules(rules_thresholds):
 
 
 
-def generate_end_automaton(packer_name , patron_name, transitions, packer_global_conditions):
+def generate_end_automaton(packer_name , patron_name, transitions, conditions):
     states = [{"state_id": i, "is_entry": "True" if i == 0 else "False", "is_final": "True" if i == len(transitions) else "False"} 
             for i in range(len(transitions) + 1)]
-    invariant_conditions = packer_global_conditions[packer_name]
+    #invariant_conditions = packer_global_conditions[packer_name]
     transitions_list = [{"src_state": 0, "dest_state": 0, "symbol": transitions[0]}]
-    transitions_list[0]["action"] = f'{{ if ({invariant_conditions}) {{ std::cout << "c\'est le packer {packer_name}" << std::endl; }} }}'
+    transitions_list[0]["action"] = f'{{ if ({conditions}) {{ std::cout << "c\'est le packer {packer_name}" << std::endl; }} }}'
     return {
-        "name": patron_name+"_"+packer_name,
+        "name": str(patron_name)+"_"+str(packer_name),
         "type": "Automaton",
         "typed_astd": {
             "attributes": [],
@@ -218,17 +241,17 @@ def generate_end_automaton(packer_name , patron_name, transitions, packer_global
     }
 
 
-def generate_ASTD_automaton(packer_name, rule_id, pattern_name,transitions,k,pattern_list):
+def generate_ASTD_automaton(pattern_name,transitions,k,pattern_list):
     states = [{"state_id": i, "is_entry": "True" if i == 0 else "False", "is_final": "True" if i == k+1 else "False"} 
                 for i in range(k + 1)]
     
     for trans in transitions:
         if trans["src_state"] == k-1 and trans["dest_state"] == k:
-            trans["action"] = f"{packer_name}_R{rule_id}_{pattern_name}=1"
+            trans["action"] = f"occ_{pattern_name}=1"
     guard_conditions = " && ".join(f'x!="{symbol}"' for symbol in pattern_list)
     guard = f"{guard_conditions}"
     return {
-                "name": "Aut1_"+str(rule_id)+"_"+pattern_name+"_"+packer_name,
+                "name": "Aut1_"+pattern_name,
                 "parameters": [],
                 "type": "Automaton",
                 "invariant": "",
@@ -238,9 +261,9 @@ def generate_ASTD_automaton(packer_name, rule_id, pattern_name,transitions,k,pat
                     "interruptCode": "",
                     "states": [
                         {
-                            "name": f"Aut2_{rule_id}_{pattern_name}_{packer_name}",
+                            "name": f"Aut2_{pattern_name}",
                             "astd": {
-                                "name":  f"Aut2_{rule_id}_{pattern_name}_{packer_name}",
+                                "name":  f"Aut2_{pattern_name}",
                                 "type": "Automaton",
                                 "invariant": "",
                                 "typed_astd": {
@@ -302,8 +325,8 @@ def generate_ASTD_automaton(packer_name, rule_id, pattern_name,transitions,k,pat
                         {
                             "arrow_type": "Local",
                             "arrow": {
-                                "from_state_name": f"Aut2_{rule_id}_{pattern_name}_{packer_name}",
-                                "to_state_name": f"Aut2_{rule_id}_{pattern_name}_{packer_name}"
+                                "from_state_name": f"Aut2_{pattern_name}",
+                                "to_state_name": f"Aut2_{pattern_name}"
                             },
                             "event_template": {
                                 "label": "e",
@@ -326,7 +349,7 @@ def generate_ASTD_automaton(packer_name, rule_id, pattern_name,transitions,k,pat
                     ],
                     "shallow_final_state_names": [],
                     "deep_final_state_names": [],
-                    "initial_state_name": f"Aut2_{rule_id}_{pattern_name}_{packer_name}"
+                    "initial_state_name": f"Aut2_{pattern_name}"
                 }
             
         }
@@ -350,68 +373,266 @@ def generate_flow(name, left_astd, right_astd, patron_names=None):
         }
         return flow_data
 
-    
-
-
-
-
-# Main execution
-if __name__ == "__main__":
-    rules_dir = "rules"
-    patterns_file = "results_output/patterns_with_ids.json"
-    output_json_file = "output.json"
-    
-    flows,conditions,packer_var_names = process_packer_rules(rules_dir, patterns_file)
-    
-    automatons_by_packer = generate_astd_automaton_for_rules(flows)
-    with open(output_json_file, "w", encoding="utf-8") as json_file:
-        json.dump(automatons_by_packer, json_file, ensure_ascii=False, indent=4)
-    
-    flows = []
-    for packer_name in automatons_by_packer:
-        automata_list = automatons_by_packer[packer_name]
-        nouveau_patron = "patron_end"
-        nouvelles_transitions = ["end"] 
-        end_automaton = generate_end_automaton(packer_name , nouveau_patron, nouvelles_transitions, conditions)
-        automata_list.append(end_automaton)
-        var_names = packer_var_names[packer_name]
-        if len(automata_list) > 1:
-            while len(automata_list) > 2:
-                dernier_kleene = automata_list.pop()
-                automata_list[-1] = generate_flow(f"FlowASTD_o{len(automata_list)-1}_{packer_name}", automata_list[-1], dernier_kleene)
-
-
-            attributes = []
-            for attr in var_names:
-                # Ajouter l'attribut occ_{patron}_{packer_name}
-                attributes.append({
-                    "name": f"{attr}",
-                    "type": "int",
-                    "initial_value": 0
-                })
-            
-
-            top_flow = {
-            "name": "FlowASTD_"+packer_name,
+def generate_flow(name, left_astd, right_astd, patron_names=None):
+        """
+        Génère un flow qui connecte deux automates et ajoute un attribut de forme occ_nom_du_patron
+        pour chaque patron dans le flux.
+        """
+        flow_data = {
+            "name": name,
             "type": "Flow",
             "invariant": "",
             "typed_astd": {
-            "attributes": attributes,
-            "code": "",
-            "interruptCode": "",
-            "left_astd": automata_list[0] if len(automata_list) > 0 else None,
-            "right_astd": automata_list[1] if len(automata_list) > 1 else None
+                "attributes": [],
+                "code": "",
+                "interruptCode": "",
+                "left_astd": left_astd,
+                "right_astd": right_astd
             }
-            }
-            flows.append(top_flow)
-        else:
-            single_automaton = automata_list[0]
-            single_automaton["typed_astd"]["attributes"] = [
-                {"name": f"{attr}", "type": "int", "initial_value": 0} for attr in var_names
-            ]
-            flows.append(single_automaton)
+        }
+        return flow_data
 
-    json_data = {
+
+# Fonction pour extraire les règles pour une classe donnée
+def extract_rules_for_class(tree,classes):
+    tree_ = tree.tree_
+    attributes = set()
+    json_file = "results_output/patterns_with_ids.json"
+    try:
+        with open(json_file, "r", encoding="utf-8") as file:
+            patrons_data = json.load(file)
+    except FileNotFoundError:
+        print(f"❌ Erreur : Fichier '{json_file}' introuvable.")
+        exit(1)
+    def traverse(node, conditions,is_root=False):
+        nonlocal attributes
+        if tree_.feature[node] != _tree.TREE_UNDEFINED:
+            feature = feature_names[tree_.feature[node]]
+            threshold = tree_.threshold[node]
+            k = math.ceil(float(threshold))
+            pattern = patrons_data.get(feature, [])[:k]
+            transitions = []
+            kmp_automaton = constructDFA(pattern,set(pattern))
+            # kmp_transitions = kmp_automaton.transition_table
+            transitions.extend(convert_dfa_to_transitions(kmp_automaton))
+            astd_automaton = generate_ASTD_automaton(feature+"_"+str(node), transitions, k, set(pattern))
+        
+            left_conditions = conditions + [f"occ_{feature}_{node} == 0"]
+            right_conditions = conditions + [f"occ_{feature}_{node} == 1"]
+            attr_name = f"occ_{feature}_{node}"
+            attributes.add(attr_name)
+
+            left_automaton = traverse(tree_.children_left[node], left_conditions)
+            right_automaton = traverse(tree_.children_right[node], right_conditions)
+
+            current_flow = generate_flow(
+                name=f"Flow_{feature}_{node}",
+                left_astd=astd_automaton,
+                right_astd=generate_flow(
+                    name=f"SubFlow_{node}",
+                    left_astd=left_automaton,
+                    right_astd=right_automaton
+                )
+            )
+            if is_root:
+                current_flow["typed_astd"]["attributes"] = [
+                    {"name": attr, "type": "int", "initial_value": 0}
+                    for attr in sorted(attributes)
+                ]
+            
+            return current_flow
+
+        else:
+            class_probs = tree_.value[node][0]
+            predicted_class = class_probs.argmax()
+            packer_name = classes[predicted_class]
+            nouveau_patron = f"patron_end_{node}"
+            nouvelles_transitions = ["end"] 
+           
+            end_automaton = generate_end_automaton(packer_name,nouveau_patron,nouvelles_transitions," && ".join(conditions))
+            return end_automaton
+            
+    return traverse(0, [], is_root=True)
+    
+
+
+
+
+
+
+# # Charger les données
+# file_path = "results_output/z_array_combined.csv"
+# data = pd.read_csv(file_path)
+
+# cols = list(data.columns)
+# feature_names = cols[1:-1]
+# X = data.iloc[:, 1:-1]
+# y = data['label']
+# filenames = data.iloc[:, 0]
+
+# # Train/test split
+# X_train, X_test, y_train, y_test = train_test_split(
+#     X, y, test_size=TEST_SIZE, shuffle=True, stratify=y, random_state=RANDOM_STATES_TO_TEST
+# )
+
+# # ← MODIFICATION : définir la grille des paramètres pour RandomForest
+# param_grid = {
+  
+#     'max_depth': [2, 3, 4,6,8,10],  # ← petites profondeurs
+#     'random_state': [SEED]
+# }
+
+# # ← MODIFICATION : GridSearchCV
+# grid_search = GridSearchCV(DecisionTreeClassifier(), param_grid,
+#                            cv=3, scoring='f1_weighted', n_jobs=-1, verbose=1)
+# grid_search.fit(X_train, y_train)
+# clf = grid_search.best_estimator_
+# print("✅ Meilleurs hyperparamètres :", grid_search.best_params_)
+
+# # Labels
+# labels = [str(cls) for cls in clf.classes_]
+# print("Labels :", labels)
+
+# # Prédiction et évaluation
+# y_pred = clf.predict(X_test)
+
+# accuracy = accuracy_score(y_test, y_pred)
+# precision = precision_score(y_test, y_pred, average='weighted')
+# recall = recall_score(y_test, y_pred, average='weighted')
+# f1 = f1_score(y_test, y_pred, average='weighted')
+
+# print(f"Precision: {precision:.2f}")
+# print(f"Recall: {recall:.2f}")
+# print(f"F1-Score: {f1:.2f}")
+# print(f"Accuracy: {accuracy:.2f}")
+
+# # Matrice de confusion
+# conf_matrix = confusion_matrix(y_test, y_pred, labels=labels)
+# plt.figure(figsize=(8, 8))
+# sns.heatmap(conf_matrix, annot=True, fmt='d', xticklabels=labels, yticklabels=labels)
+# plt.ylabel("Actual")
+# plt.xlabel("Predicted")
+# plt.show()
+
+# # Visualiser jusqu’à 3 arbres
+# plt.figure(figsize=(15, 10))
+# plot_tree(clf, filled=True, feature_names=X.columns, class_names=labels, fontsize=10)
+# plt.title("Arbre de décision")
+# plt.show()
+
+
+
+output_directory = "results_output"
+
+
+
+
+
+# Charger le fichier CSV
+file_path = "results_output/z_array_combined.csv"  # Remplacez par le chemin de votre fichier CSV
+data = pd.read_csv(file_path)
+
+cols = list(data.columns)
+feature_names = cols[1:-1]
+X = data.iloc[:, 1:-1]
+y = data['label']
+filenames = data.iloc[:, 0]
+
+# Train/test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=TEST_SIZE, shuffle=True, stratify=y, random_state=RANDOM_STATES_TO_TEST
+)
+
+# ← MODIFICATION : définir la grille des paramètres pour RandomForest
+param_grid = {
+  
+    'max_depth': [2, 3, 4,6,8,10],  # ← petites profondeurs
+    'random_state': [SEED]
+}
+
+# ← MODIFICATION : GridSearchCV
+grid_search = GridSearchCV(DecisionTreeClassifier(), param_grid,
+                           cv=3, scoring='f1_weighted', n_jobs=-1, verbose=1)
+grid_search.fit(X_train, y_train)
+clf = grid_search.best_estimator_
+print("✅ Meilleurs hyperparamètres :", grid_search.best_params_)
+
+# Labels
+labels = [str(cls) for cls in clf.classes_]
+print("Labels :", labels)
+
+# Prédiction et évaluation
+y_pred = clf.predict(X_test)
+
+accuracy = accuracy_score(y_test, y_pred) * 100
+precision = precision_score(y_test, y_pred, average='weighted') * 100
+recall = recall_score(y_test, y_pred, average='weighted') * 100
+f1 = f1_score(y_test, y_pred, average='weighted') * 100
+
+print(f"Precision: {precision:.2f}")
+print(f"Recall: {recall:.2f}")
+print(f"F1-Score: {f1:.2f}")
+print(f"Accuracy: {accuracy:.2f}")
+
+# Matrice de confusion
+conf_matrix = confusion_matrix(y_test, y_pred, labels=labels)
+plt.figure(figsize=(8, 8))
+sns.heatmap(conf_matrix, annot=True, fmt='d', xticklabels=labels, yticklabels=labels)
+plt.ylabel("Actual")
+plt.xlabel("Predicted")
+plt.show()
+
+# Visualiser jusqu’à 3 arbres
+plt.figure(figsize=(15, 10))
+plot_tree(clf, filled=True, feature_names=X.columns, class_names=labels, fontsize=10)
+plt.title("Arbre de décision")
+plt.show()
+
+# Extraire les règles pour chaque classe
+
+
+tree_text = export_text(clf, feature_names=list(X.columns))
+print(tree_text)
+
+# Prédiction sur tout le dataset
+y_pred_full = clf.predict(X)
+accuracy = accuracy_score(y, y_pred_full)*100
+precision = precision_score(y, y_pred_full, average='weighted')*100
+recall = recall_score(y, y_pred_full, average='weighted')*100
+f1 = f1_score(y, y_pred_full, average='weighted')*100
+
+print(f"Full Precision: {precision:.2f}")
+print(f"Full Recall: {recall:.2f}")
+print(f"Full F1-Score: {f1:.2f}")
+print(f"Full Accuracy: {accuracy:.2f}")
+
+# Matrice de confusion complète
+conf_matrix = confusion_matrix(y, y_pred_full, labels=labels)
+plt.figure(figsize=(8, 8))
+sns.heatmap(conf_matrix, annot=True, fmt='d', xticklabels=labels, yticklabels=labels)
+plt.ylabel("Actual")
+plt.xlabel("Predicted")
+plt.show()
+
+# Erreurs de classification
+misclassified_indices = np.where(y != y_pred_full)[0]
+misclassified_samples = X.iloc[misclassified_indices].copy()
+misclassified_samples['filename'] = filenames.iloc[misclassified_indices].values
+misclassified_samples['true_label'] = y.iloc[misclassified_indices].values
+misclassified_samples['predicted_label'] = y_pred_full[misclassified_indices]
+misclassified_samples = misclassified_samples[['filename', 'true_label', 'predicted_label']]
+print("\n🔍 Exemples mal classés :")
+print(misclassified_samples.head())
+misclassified_samples.to_csv("results_output/misclassified_samples.csv", index=False)
+print("\n💾 Misclassifications sauvegardées dans 'results_output/misclassified_samples.csv'")
+
+
+automata_generator = extract_rules_for_class(clf,clf.classes_)
+#print(automata_generator)
+
+
+
+json_data = {
             "target": "c++",
             "imports": [],
             "type_definitions": {"schemas": [], "native_types": {}, "events": []},
@@ -419,33 +640,7 @@ if __name__ == "__main__":
             "conf": []
         }
 
-    if len(flows)>1:
-        while len(flows) > 2:
-            dernier_flow = flows.pop()
-            flows[-1] = generate_flow(f"FlowASTD_b{len(flows)-1}", flows[-1], dernier_flow)
+json_data["top_level_astds"].append(automata_generator)
 
-        top_flows = {
-        "name": "FlowASTD",
-        "parameters": [],
-        "type": "Flow",
-        "invariant": "",
-        "typed_astd": {
-        "attributes": [],
-        "code": "",
-        "interruptCode": "",
-        "left_astd": flows[0] if len(flows) > 0 else None,
-        "right_astd":flows[1] if len(flows) > 1 else None
-        }
-        }
-
-        json_data["top_level_astds"].append(top_flows)
-
-    else:
-        json_data["top_level_astds"].append(flows[0])
-
-
-
-
-    with open(f'specV6.json', 'w') as jsonfile:
-        json.dump(json_data, jsonfile, indent=2)
-    print("JSON file generated successfully")
+with open(f'model.json', 'w') as jsonfile:
+    json.dump(json_data, jsonfile, indent=2)
