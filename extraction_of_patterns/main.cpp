@@ -1,11 +1,14 @@
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <string>
 #include <vector>
 #include "json.hpp"
 #include <set>
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
+
 using namespace std;
 
 
@@ -19,6 +22,8 @@ extern "C" {
     #include "stree_ukkonen.h"
     #include "repeats_supermax.h"
     #include "repeats_primitives.h"
+    //#include "repeats_tandem.h"
+  
 }
 
 int cpt = 0;
@@ -74,46 +79,45 @@ public:
 
 
 
-    std::string str() const {
-        std::string result = fn + "(";
-        for (const auto& arg : IN) {
-            for (const auto& val : arg) {
-                result += val + ",";
-            }
+std::string str() const {
+    std::string result = fn + "(";
+    for (const auto& arg : IN) {
+        for (const auto& val : arg) {
+            result += val + ",";
         }
-        result.pop_back(); // Remove trailing comma
-        result += ")";
-        return result;
     }
+    result.pop_back(); // Remove trailing comma
+    result += ")";
+    return result;
+}
 
-    std::string repr() const {
-        return str();
-    }
+std::string repr() const {
+    return str();
+}
 
-       static std::vector<Node> build_graph(const std::vector<json>& lines) {
-        std::vector<Node> nodes;
-        for (const auto& line : lines) {
-            //if (line.find("FunctionName") != line.end()) {
-                std::unordered_map<std::string, std::string> data;
-                for (auto it = line.begin(); it != line.end(); ++it) {
-                   
-                    if (it.key() == "FunctionName" || it.key() == "Functionname" || it.key() == "Address" || it.key() == "Timesptamp"
-                    || it.key() == "Return") {
-                        //std::cout <<"key :" <<it.key() << std::endl;
-                        //std::cout <<"value :" <<it.value() << std::endl;
-                        data[it.key()] = it.value();
-                    }            
-                }
-                nodes.emplace_back(data);
-           //}
+static std::vector<Node> build_graph(const std::vector<json>& lines) {
+std::vector<Node> nodes;
+for (const auto& line : lines) {
+    //if (line.find("FunctionName") != line.end()) {
+        std::unordered_map<std::string, std::string> data;
+        for (auto it = line.begin(); it != line.end(); ++it) {
+            
+            if (it.key() == "FunctionName" || it.key() == "Functionname" || it.key() == "Address" || it.key() == "Timesptamp"
+            || it.key() == "Return") {
+                //std::cout <<"key :" <<it.key() << std::endl;
+                //std::cout <<"value :" <<it.value() << std::endl;
+                data[it.key()] = it.value();
+            }            
         }
-        return nodes;
-    }
+        nodes.emplace_back(data);
+    //}
+}
+return nodes;
+}
 };
 
 
-// Using a variant to store different types of data
-using RepeatData = std::variant<std::vector<int>, Triplet>;
+
 
 // Method to extract FunctionNames from a list of nodes
 std::vector<std::string> extractFunctionNames(const std::vector<Node>& nodes) {
@@ -126,8 +130,8 @@ std::vector<std::string> extractFunctionNames(const std::vector<Node>& nodes) {
 }
 
 // Method to determine unique function names from a list of nodes
-std::unordered_set<std::string> uniqueFunctionNames(const std::vector<std::string>& functionNames) {
-    std::unordered_set<std::string> uniqueNames;
+std::set<std::string> uniqueFunctionNames(const std::vector<std::string>& functionNames) {
+    std::set<std::string> uniqueNames;
     for (const auto& fn : functionNames) {
         uniqueNames.insert(fn);
     }
@@ -143,7 +147,7 @@ std::set<std::string> orderedUniqueFunctionNames(const std::unordered_set<std::s
 
 
 // Method to associate unique function names with numbers in order
-std::map<std::string, int> associateFunctionNamesWithNumbers(const std::set<std::string>& uniqueFunctionNames) {
+ std::map<std::string, int> associateFunctionNamesWithNumbers(const std::set<std::string>& uniqueFunctionNames) {
     std::map<std::string, int> functionNameToNumberMap;
     int number = 1; // Start numbering from 1
     for (const auto& functionName : uniqueFunctionNames) {
@@ -167,95 +171,6 @@ std::vector<int> remplacerAppelsSystemeParNumeros(const std::vector<std::string>
 
 
 
-
-// Comparateur pour les triplets pour les utiliser comme clé dans la map
-struct TripletComparator {
-    bool operator()(const Triplet& a, const Triplet& b) const {
-        if (a.length != b.length) return a.length < b.length;
-        return std::lexicographical_compare(a.sequence, a.sequence + a.length, b.sequence, b.sequence + b.length);
-    }
-};
-
-// Fonction pour vérifier si deux séquences sont des traductions circulaires
-bool are_circular_permutations(const std::vector<int>& seq1, const std::vector<int>& seq2) {
-    if (seq1.size() != seq2.size()) return false;
-
-    std::vector<int> doubled_seq1(seq1);
-    doubled_seq1.insert(doubled_seq1.end(), seq1.begin(), seq1.end());
-
-    for (size_t i = 0; i < seq1.size(); ++i) {
-        if (std::equal(seq2.begin(), seq2.end(), doubled_seq1.begin() + i)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Fonction pour afficher une séquence
-void print_sequence(const std::vector<int>& sequence) {
-    for (int num : sequence) {
-        std::cout << num << " ";
-    }
-}
-
-// Fonction pour afficher les informations d'un triplet
-void print_triplet(const Triplet& triplet) {
-    std::cout << "Start: " << triplet.start << ", Length: " << triplet.length
-              << ", Iteration: " << triplet.iteration << ", Sequence: ";
-    print_sequence(std::vector<int>(triplet.sequence, triplet.sequence + triplet.length));
-    std::cout << std::endl;
-}
-
-// Fonction pour afficher les triplets dans la map
-void print_map(const std::map<Triplet, std::vector<Triplet>, TripletComparator>& result_map) {
-    for (const auto& entry : result_map) {
-        std::cout << "Canonical Sequence: ";
-        print_triplet(entry.first);
-        std::cout << "\nTriplet Info:\n";
-        
-        for (const auto& triplet : entry.second) {
-            print_triplet(triplet);
-        }
-        std::cout << std::endl;
-    }
-}
-
-// Fonction pour convertir la liste en une map de séquences
-std::map<Triplet, std::vector<Triplet>, TripletComparator> convert_list_to_map(TripletNode* list) {
-    std::map<Triplet, std::vector<Triplet>, TripletComparator> result_map;
-
-    TripletNode* current = list;
-
-    while (current != nullptr) {
-        std::vector<int> current_seq(current->triplet.sequence, current->triplet.sequence + current->triplet.length);
-
-        bool key_exists = false;
-        Triplet* existing_key = nullptr;
-
-        // Vérifier si la séquence est déjà une permutation circulaire d'une clé existante
-        for (auto& [key, _] : result_map) {
-            std::vector<int> key_seq(key.sequence, key.sequence + key.length);
-            if (are_circular_permutations(current_seq, key_seq)) {
-                key_exists = true;
-                existing_key = const_cast<Triplet*>(&key);
-                break;
-            }
-        }
-
-        if (!key_exists) {
-            // Ajouter une nouvelle clé avec les triplets associés
-            result_map[current->triplet] = std::vector<Triplet>();
-        } else {
-            // Ajouter le triplet actuel à la clé existante
-            result_map[*existing_key].push_back(current->triplet);
-        }
-
-        current = current->next;
-    }
-
-    return result_map;
-}
-
 // Fonction pour convertir la liste en vecteur
 std::vector<Triplet> convert_list_to_vector(TripletNode* list){
 
@@ -268,39 +183,6 @@ std::vector<Triplet> convert_list_to_vector(TripletNode* list){
     return tandem_repeats;
 }
 
-// Function to check if a set is a subset of another set
-bool is_subset(const std::set<int>& subset, const std::set<int>& superset) {
-    return std::includes(superset.begin(), superset.end(), subset.begin(), subset.end());
-}
-
-// Function to add primitive_repeats to the map based on the specified conditions
-void add_primitive_repeats_to_map(std::map<std::set<int>, std::vector<RepeatData>>& repeats_map, 
-                                  const std::vector<Triplet>& primitive_repeats) {
-    for (auto& triplet : primitive_repeats) {
-        // Create a set from the repeat vector
-        std::set<int> unique_chars(triplet.sequence, triplet.sequence + triplet.length);
-        bool added = false;
-
-        // Try adding to the key with the same alphabet
-        for (auto& pair : repeats_map) {
-            if (unique_chars == pair.first) {
-                pair.second.push_back(triplet);
-                added = true;
-                break;
-            }
-        }
-
-        // If not added, try adding to a key containing the alphabet as a subset
-        if (!added) {
-            for (auto& pair : repeats_map) {
-                if (is_subset(unique_chars, pair.first)) {
-                    pair.second.push_back(triplet);
-                    break; // Once added, no need to check other keys
-                }
-            }
-        }
-    }
-}
 
 // Fonction pour retrouver les supermaximals repeats
 std::vector<std::vector<int>> get_maximal_repeats(std::vector<int> dataVector,int minPercent, int minLength){
@@ -328,306 +210,625 @@ std::vector<std::vector<int>> get_maximal_repeats(std::vector<int> dataVector,in
 }
 
 
-// Function to create a map with sets of unique integers as keys and corresponding vectors as values
-std::map<std::set<int>, std::vector<RepeatData>>  create_repeats_map(const std::vector<std::vector<int>>& maximal_repeats) {
-    // Map to hold sets of unique integers as keys and corresponding vectors as values
-    std::map<std::set<int>, std::vector<RepeatData>> repeats_map;
-    
-    // Iterate over the maximal_repeats vector
-    for (const auto& repeat : maximal_repeats) {
-        // Create a set from the repeat vector
-        std::set<int> unique_chars(repeat.begin(), repeat.end());
-        
-        // Insert the set and the corresponding repeat vector into the map
-        repeats_map[unique_chars].push_back(repeat);
+// Fonction pour récupérer les répétitions maximales
+std::vector<std::tuple<std::vector<int>, std::vector<int>>> get_maximal_repeats1(std::vector<int> dataVector, int minPercent, int minLength) {
+    // Trouver les supermaximaux dans la chaîne d'entrée
+    SUPERMAXIMALS supermaximals = supermax_find(dataVector.data(), dataVector.size(), minPercent, minLength);
+
+    // Préparer le résultat sous forme de tuples
+    std::vector<std::tuple<std::vector<int>, std::vector<int>>> supermaximalTuples;
+    SUPERMAXIMALS current = supermaximals;
+
+    while (current != NULL) {
+        std::vector<int> supermaximalSequence(current->S, current->S + current->M);
+        std::vector<int> indicesList(current->start_indices, current->start_indices + current->num_start_indices);
+
+        supermaximalTuples.emplace_back(std::make_tuple(supermaximalSequence, indicesList));
+
+        current = current->next;
     }
-    
-    return repeats_map;
+
+    return supermaximalTuples;
 }
 
 
-// Function to subtract maximal_repeats from near_maximal_repeats
-std::vector<std::vector<int>> subtract_repeats(const std::vector<std::vector<int>>& near_maximal_repeats, const std::vector<std::vector<int>>& maximal_repeats) {
-    std::vector<std::vector<int>> result;
-    
-    // Use a set for maximal_repeats for faster look-up
-    std::set<std::vector<int>> maximal_repeats_set(maximal_repeats.begin(), maximal_repeats.end());
-    
-    for (const auto& repeat : near_maximal_repeats) {
-        if (maximal_repeats_set.find(repeat) == maximal_repeats_set.end()) {
-            result.push_back(repeat);
-        }
+// Fonction pour associer des noms de fonctions avec des nombres
+std::map<int, std::string> reversefnMap(std::map<std::string, int>& fnMap) {
+    std::map<int, std::string> reverseFnMap;
+    for (const auto& entry : fnMap) {
+        reverseFnMap[entry.second] = entry.first;
     }
-    
-    return result;
+    return reverseFnMap;
 }
 
 
 
+// Fonction pour écrire le JSON dans un fichier
+void writeJsonToFile(const json& j, const string& filename) {
+    ofstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Unable to open file: " << filename << endl;
+        return;
+    }
+    file << j.dump(4);  // 4 pour l'indentation
+    file.close();
+}
 
-// Fonction pour ajouter les near_super_maximals à la map selon les critères spécifiés
-void add_near_super_maximals_to_map(std::map<std::set<int>, std::vector<RepeatData>>& repeats_map, 
-                                    const std::vector<std::vector<int>>& filtered_near_super_maximals) {
-    for (const auto& repeat : filtered_near_super_maximals) {
-        std::set<int> unique_chars(repeat.begin(), repeat.end());
-        bool added = false;
 
-        // Essayez d'ajouter à la clé avec le même alphabet
-        for (auto& pair : repeats_map) {
-            if (unique_chars == pair.first) {
-                pair.second.push_back(repeat);
-                added = true;
+std::vector<int> replaceTandemRepeats(const std::vector<int>& dataVector, std::vector<Triplet>& tandemRepeatSequences) {
+    std::vector<int> newTrace;
+    size_t i = 0;
+
+    while (i < dataVector.size()) {
+        bool foundRepeat = false;
+
+        for (const auto& repeatSequence : tandemRepeatSequences) {
+            size_t len = repeatSequence.length;
+            // std::cout << "Sequence contents: ";
+            // for (size_t j = 0; j < len; ++j) {
+            //     std::cout << repeatSequence.sequence[j] << " ";
+            // }
+            // cout<<repeatSequence.length<<endl;
+            // Vérification des pointeurs et des limites
+            if (repeatSequence.sequence == nullptr || len <= 0 || len > dataVector.size()) {
+                
+                throw std::runtime_error("Séquence ou longueur invalide dans Triplet !");
+            }
+
+            // Vérification des répétitions
+            if (i + len <= dataVector.size() && std::equal(repeatSequence.sequence, repeatSequence.sequence + len, dataVector.begin() + i)) {
+
+
+                // std::cout<<"tandem repeat found"<<std::endl;
+                // Insertion de la séquence
+                newTrace.insert(newTrace.end(), repeatSequence.sequence, repeatSequence.sequence + len);
+
+                // Avancement de l'indice pour sauter les répétitions
+                while (i + len <= dataVector.size() && std::equal(repeatSequence.sequence, repeatSequence.sequence + len, dataVector.begin() + i)) {
+                    i += len;
+                }
+
+                foundRepeat = true;
                 break;
             }
         }
 
-        // Si non ajouté, essayez d'ajouter à une clé contenant l'alphabet comme sous-ensemble
-        if (!added) {
-            for (auto& pair : repeats_map) {
-                if (is_subset(unique_chars, pair.first)) {
-                    pair.second.push_back(repeat);
-                    break; // Une fois ajoutée, pas besoin de vérifier d'autres clés
-                }
-            }
+        // Si aucune répétition n'est trouvée, ajoutez l'élément courant
+        if (!foundRepeat) {
+            newTrace.push_back(dataVector[i]);
+            ++i;
         }
     }
-}
 
-
-// Fonction pour sauvegarder le repeats_map dans un fichier texte
-void save_repeats_map_to_file(const std::map<std::set<int>, std::vector<RepeatData>>& repeats_map, const std::string& filename) {
-    std::ofstream outfile(filename);
-    if (!outfile.is_open()) {
-        std::cerr << "Could not open the file!" << std::endl;
-        return;
-    }
-
-    for (const auto& pair : repeats_map) {
-        outfile << "{";
-        for (auto it = pair.first.begin(); it != pair.first.end(); ++it) {
-            if (it != pair.first.begin()) outfile << ",";
-            outfile << *it;
-        }
-        outfile << "} = {";
-
-        for (auto it = pair.second.begin(); it != pair.second.end(); ++it) {
-            std::visit([&outfile](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, std::vector<int>>) {
-                    outfile << "[";
-                    for (size_t i = 0; i < arg.size(); ++i) {
-                        if (i != 0) outfile << ",";
-                        outfile << arg[i];
-                    }
-                    outfile << "]";
-                } else if constexpr (std::is_same_v<T, Triplet>) {
-                    outfile << "(" << arg.start << ", [";
-                    for (int i = 0; i < arg.length; ++i) {
-                        if (i != 0) outfile << ",";
-                        outfile << arg.sequence[i];
-                    }
-                    outfile << "], " << arg.iteration << ")";
-                }
-            }, *it);
-
-            if (std::next(it) != pair.second.end()) {
-                outfile << ", ";
-            }
-        }
-        outfile << "}\n";
-    }
-
-    outfile.close();
+    return newTrace;
 }
 
 
 
-
-
-// Fonction pour fusionner les occurrences des séquences dans la map
-std::map<Triplet, std::vector<Triplet>, TripletComparator> merge_occurrences(std::map<Triplet, std::vector<Triplet>, TripletComparator>& result_map) {
-    std::map<Triplet, std::vector<Triplet>, TripletComparator> new_result_map;
-
-    for (auto& [key, triplets] : result_map) {
-        std::vector<Triplet> merged_triplets;
-        Triplet current = key;
-        Triplet new_key = current;
-
-        for (auto& triplet : triplets) {
-            int current_end = new_key.start + (new_key.length * new_key.iteration);
-            int next_start = triplet.start;
-
-            if (current_end >= next_start) {
-                int next_end = triplet.start + (triplet.length * triplet.iteration);
-                if ((next_end - current_end)>= new_key.length &&
-                ((next_end - current_end)-(next_start - new_key.start)) % new_key.length == 0) {
-                    int value = ((next_end - current_end)-(next_start - new_key.start)) / new_key.length;
-                    // Étendre l'itération actuelle
-                    if(value<=1){
-                        new_key.iteration +=1;
-                    }else{
-                        new_key.iteration += value;
-                    }
-                }else if((next_end - current_end)-(next_start - new_key.start) < new_key.length){
-                    continue;
-                }else {
-                    // Ajouter le triplet actuel au résultat et continuer
-                    merged_triplets.push_back(triplet);
-                }
-                            
-            } else {
-                // Ajouter le triplet actuel au résultat et commencer une nouvelle fusion
-                merged_triplets.push_back(triplet);
-            }
-        }
-        // Ajouter les triplets fusionnés à la nouvelle map
-        new_result_map[new_key] = merged_triplets;
-    }
-    // Retourner la nouvelle map avec les valeurs fusionnées
-    return new_result_map;
-}
-
-
-
-
-
-int main(int argc, char *argv[]) {
-   
-    // if (argc < 4) {
-    //     std::cerr << "Usage: " << argv[0] << " <file1> <file2> <file3>" << std::endl;
-    //     return 1;
-    // }
-    // Initial delimiter value
-    int delimiterCounter = 1;
-    std::vector<std::string> filenames = {"pec2-hostname.exe.bin.json"};
-  
-    std::vector<std::string> functionNamesglobal;
-
-    for (const auto& filename : filenames) {
-        // Open the JSON file
-        std::ifstream file(filename);
-        if (!file.is_open()) {
-            std::cerr << "Error: Unable to open file " << filename << std::endl;
-            return 1;
-        }
-
-        // Read the JSON content line by line
-        std::string line;
-        std::vector<json> lines;
-        while (std::getline(file, line)) {
-            if (!line.empty()) {
-                try {
-                    json jsonLine = json::parse(line);
-                    lines.push_back(jsonLine);
-                } catch (const std::exception& e) {
-                    std::cerr << "Error: Failed to parse JSON line: " << line << std::endl;
-                }
-            }
-        }
-
-        // Process the JSON data
-        std::vector<Node> nodes = Node::build_graph(lines);
-        std::vector<std::string> functionNames = extractFunctionNames(nodes);
-        functionNamesglobal.insert(functionNamesglobal.end(), functionNames.begin(),functionNames.end());
-        // Add a unique delimiter for this file
-        functionNamesglobal.push_back("DELIM_" + std::to_string(delimiterCounter));
-        delimiterCounter++;
-    }
-  
-     // Ajout de "()" à chaque nom de fonction
-    for (std::string& name : functionNamesglobal) {
-        cout<<name<<endl;
-        name += "()";
-    }   
-
-    // Ouverture d'un fichier .txt pour écrire les noms de fonctions modifiés
-    std::ofstream outFile("functions.txt");
-    if (!outFile) {
-        std::cerr << "Erreur d'ouverture du fichier!" << std::endl;
-        return 1;
-    }
-
-      // Écriture des noms de fonctions dans le fichier
-    for (const std::string& name : functionNamesglobal) {
-        outFile << name << std::endl;
-    }
-
-    // Fermeture du fichier
-    outFile.close();
-
-
-
-    // // Convertir le vecteur de vecteurs de chaînes en un objet JSON
-    json jsonData3 = functionNamesglobal;
-
-    // // Écrire le contenu JSON dans un fichier
-    ofstream outputFile11("functionNames.json");
-    if (outputFile11.is_open()) {
-         outputFile11 << jsonData3.dump(4); // L'argument 4 pour une indentation de 4 espaces
-         outputFile11.close();
-         cout << "Le fichier JSON a été créé avec succès." << endl;
-     } else {
-         cout << "Erreur: Impossible d'ouvrir le fichier JSON pour l'écriture." << endl;
-     }
-
-    std::unordered_set<std::string> uniqueNamesSet = uniqueFunctionNames(functionNamesglobal);
-    std::set<std::string> orderList = orderedUniqueFunctionNames(uniqueNamesSet);
-    std::map<std::string, int> fnMap = associateFunctionNamesWithNumbers(orderList);
-
-
-    // Convertir le vecteur de vecteurs de chaînes en un objet JSON
-    json jsonData66 = fnMap;
-
-    // Écrire le contenu JSON dans un fichier
-    ofstream outputFile444("mapFn.json");
-    if (outputFile444.is_open()) {
-        outputFile444 << jsonData66.dump(4); // L'argument 4 pour une indentation de 4 espaces
-        outputFile444.close();
-        cout << "Le fichier JSON a été créé avec succès." << endl;
-    } else {
-        cout << "Erreur: Impossible d'ouvrir le fichier JSON pour l'écriture." << endl;
-    }
-
-    std::vector<int> dataVector = remplacerAppelsSystemeParNumeros(functionNamesglobal, fnMap);
-
-    for (const auto& num : dataVector) {
-        std::cout << num << " ";
-    }
-    std::cout << std::endl;
-      // Print the size of the integer vector
-    std::cout << "Size of the vector: " << dataVector.size() << std::endl;
-    std::vector<std::vector<int>> maximal_repeats = get_maximal_repeats(dataVector,100,3);
-    std::map<std::set<int>, std::vector<RepeatData>> super_maximal_repeats_map = create_repeats_map(maximal_repeats);
-    std::vector<std::vector<int>> near_maximal_repeats = get_maximal_repeats(dataVector,0,3);
-    std::vector<std::vector<int>> substraction = subtract_repeats(near_maximal_repeats,maximal_repeats);
-    // Add the filtered near_super_maximals to the map if the alphabet is included in any key
-    add_near_super_maximals_to_map(super_maximal_repeats_map, substraction );
-
+std::vector<Triplet> find_primitive_repests(std::vector<int> dataVector){
     primitives_struct *pr_struct;
     /*
     * Allocate the memory.
     */
-    printf("Preprocessing...\n");
-    //Modifier l'entrée
     pr_struct = primitives_prep(dataVector.data(), dataVector.data(), dataVector.size());
-    if(pr_struct == nullptr)
-        return 0;
-
-    /*
-    * Report the results.
-    */
-    printf("\nThe following primitive tandem repeats were found:\n\n");
     primitives_find(pr_struct);
     sort_triplets();
     group_and_verify_tandem_repeats(dataVector.data());
     TripletNode* triplet_list_head = NULL;
     triplet_list_head = get_triplet_list_head();
-    std::vector<Triplet> primitive_repeats = convert_list_to_vector(triplet_list_head);
-    add_primitive_repeats_to_map(super_maximal_repeats_map, primitive_repeats);
-    print_triplets();
+    std::vector<Triplet>  primitive_repeats = convert_list_to_vector(triplet_list_head);
     primitives_free(pr_struct);
-        // Sauvegarder les résultats dans un fichier texte
-    save_repeats_map_to_file(super_maximal_repeats_map, "repeats_map.txt");
+    return primitive_repeats;
+}
 
+
+int findMaxLength(const std::vector<Triplet>& primitive_repeats) {
+if (primitive_repeats.empty()) return 0;
+
+int max_length = 0;
+
+for (const auto& triplet : primitive_repeats) {
+    if (triplet.length > max_length) {
+        max_length = triplet.length;
+    }
+}
+
+return max_length;
+}
+
+// Fonction pour obtenir les indices des délimiteurs dans la trace
+std::vector<int> getDelimiterIndices(const std::vector<int>& newTrace, const std::vector<int>& delimitors) {
+    std::vector<int> delimiterIndices;
+
+    // Parcourir la trace pour trouver les indices des délimiteurs
+    for (size_t i = 0; i < newTrace.size(); ++i) {
+        if (std::find(delimitors.begin(), delimitors.end(), newTrace[i]) != delimitors.end()) {
+            delimiterIndices.push_back(i); // Ajouter l'indice du délimiteur
+        }
+    }
+
+    return delimiterIndices;
+}
+
+int findTraceForIndex(int index, const std::vector<int>& delimiterIndices) {
+    for (size_t i = 0; i < delimiterIndices.size(); ++i) {
+        if (index-1 < delimiterIndices[i]) {
+            return i; // Index belongs to trace `i`
+        }
+    }
+    return delimiterIndices.size(); // Index belongs to the last trace
+}
+
+int countUniqueTraces(const std::vector<int>& repeatIndices, const std::vector<int>& delimiterIndices) {
+    std::vector<int> traceOcc;
+    
+    // Step 1: Determine the trace for each index in repeatIndices
+    for (int index : repeatIndices) {
+        traceOcc.push_back(findTraceForIndex(index, delimiterIndices));
+    }
+    
+    // Step 2: Convert traceOcc to a set to get unique trace numbers
+    std::unordered_set<int> uniqueTraces(traceOcc.begin(), traceOcc.end());
+    
+    // Step 3: Return the size of the set, which is the count of unique traces
+    return uniqueTraces.size();
+}
+
+
+    std::vector<vector<int>> filterSuperMaximalsInMultipleTraces(
+    const std::vector<std::tuple<vector<int>, std::vector<int>>>& maximal_repeats_with_indices,
+    const std::vector<int>& delimiterIndices) {
+
+    std::vector<vector<int>> maximalRepeats;
+
+    // Iterate over each repeat and its indices
+    for (const auto& [repeat, indices] : maximal_repeats_with_indices) {
+        // Check if repeat appears in at least two unique traces
+        if (countUniqueTraces(indices, delimiterIndices) >= 2 && repeat.size()>=3 ) {
+            maximalRepeats.push_back(repeat);
+        }
+    }
+
+    return maximalRepeats;
+}
+
+// Fonction pour sauvegarder mapFn dans un fichier JSON
+void saveMapFn(const std::string& filename, const std::map<std::string, int>& mapFn) {
+    std::ofstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "Erreur : Impossible d'ouvrir le fichier pour l'écriture " << filename << std::endl;
+        return;
+    }
+
+    json j(mapFn);
+    file << j.dump(4);  // 4 espaces d'indentation
+}
+
+// Fonction pour remplacer les appels système par leurs numéros
+std::vector<int> replaceSystemCalls(std::vector<std::string>& systemCalls, std::map<std::string, int>& mapFn) {
+    std::vector<int> callNumbers;
+    int nextNumber = mapFn.size() + 1;
+
+    for (const std::string& call : systemCalls) {
+        // Si l'appel système est dans mapFn, utiliser le numéro existant
+        if (mapFn.find(call) != mapFn.end()) {
+            callNumbers.push_back(mapFn[call]);
+        } else {
+            // Sinon, ajouter l'appel avec un nouveau numéro dans mapFn
+            mapFn[call] = nextNumber;
+            callNumbers.push_back(nextNumber);
+            nextNumber++;
+        }
+    }
+
+    return callNumbers;
+}
+
+// Fonction pour inverser mapfn
+std::unordered_map<int, std::string> invertMap(const std::map<std::string, int>& mapfn) {
+    std::unordered_map<int, std::string> inverseMap;
+    for (const auto& pair : mapfn) {
+        inverseMap[pair.second] = pair.first;
+    }
+    return inverseMap;
+}
+
+std::vector<std::vector<std::string>> convertToStrings(const std::vector<std::vector<int>>& filtredMaximalRepeats, 
+                                                       const std::unordered_map<int, std::string>& inverseMap) {
+    std::vector<std::vector<std::string>> maximalrepeatsstring;
+
+    for (const auto& repeat : filtredMaximalRepeats) {
+        std::vector<std::string> stringRepeat;
+        for (int val : repeat) {
+            if (inverseMap.find(val) != inverseMap.end()) {
+                stringRepeat.push_back(inverseMap.at(val)); // Remplace par la chaîne correspondante
+            } else {
+                stringRepeat.push_back("unknown"); // Valeur par défaut si non trouvée
+            }
+        }
+        maximalrepeatsstring.push_back(stringRepeat);
+    }
+
+    return maximalrepeatsstring;
+
+}
+
+
+
+bool isValidUTF8(unsigned char c) {
+    return (c >= 32 && c <= 126) || (c >= 160); // Garde les caractères imprimables
+}
+
+std::string removeInvalidUTF81(const std::string& input) {
+    std::string output;
+    for (unsigned char c : input) {
+        if (isValidUTF8(c)) {
+            output += c;
+        }
+    }
+    return output;
+}
+
+
+
+// Fonction pour traiter les fichiers et générer des traces combinées
+std::vector<int> processFiles(string folderPath,const std::vector<std::string>& filenames, int& delimiterCounter, 
+                              std::map<std::string, int>& fnMap, std::vector<int>& delimitors) {
+    std::vector<std::string> functionNamesGlobal;
+    for (const auto& filename : filenames) {
+        // Ouvrir le fichier JSON
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            std::cerr << "Erreur: Impossible d'ouvrir le fichier " << filename << std::endl;
+            continue;
+        }
+        
+        // Lire le JSON ligne par ligne
+        std::string line;
+        std::vector<json> lines;
+        while (std::getline(file, line)) {
+            line = removeInvalidUTF81(line); 
+            if (!line.empty()) {
+                try {
+                    json jsonLine = json::parse(line);
+                    //std::cout<<jsonLine<<std::endl;
+                    lines.push_back(jsonLine);
+                } catch (const std::exception& e) {
+                    std::cerr << "Erreur: Échec de l'analyse de la ligne JSON: " << line << std::endl;
+                }
+            }
+        }
+        
+        // Construire le graphe et extraire les noms de fonctions
+        std::vector<Node> nodes = Node::build_graph(lines);
+        std::vector<std::string> functionNames = extractFunctionNames(nodes);
+        functionNamesGlobal.insert(functionNamesGlobal.end(), functionNames.begin(), functionNames.end());
+        
+        // Ajouter un délimiteur unique
+        functionNamesGlobal.push_back("DELIM_"+folderPath + std::to_string(delimiterCounter));
+        delimiterCounter++;
+    }
+    
+    // Utiliser un ensemble pour stocker les noms uniques et assurer un mappage commun
+    std::set<std::string> uniqueNamesSet = uniqueFunctionNames(functionNamesGlobal);
+    
+    // Associer chaque nom unique à un numéro s'il n'est pas déjà dans le dictionnaire
+    for (const auto& name : uniqueNamesSet) {
+        if (fnMap.find(name) == fnMap.end()) {
+            int newId = fnMap.size() + 1;
+            fnMap[name] = newId;
+        }
+    }
+
+    // Remplacer les appels système par leurs numéros en utilisant le même dictionnaire `fnMap`
+    return remplacerAppelsSystemeParNumeros(functionNamesGlobal, fnMap);
+}
+
+std::vector<std::vector<int>> generateSubsequences(const std::vector<int>& sequence) {
+    std::vector<std::vector<int>> subsequences;
+
+    // Parcourir chaque position de départ dans la séquence
+    for (size_t start = 0; start < sequence.size(); ++start) {
+        // Parcourir chaque position de fin en commençant par la fin de la séquence
+        for (size_t end = sequence.size(); end > start ; --end) {
+            // Ajouter la sous-séquence de [start, end)
+            subsequences.emplace_back(sequence.begin() + start, sequence.begin() + end);
+        }
+    }
+
+    return subsequences;
+}
+
+// Comparateur pour std::set pour comparer deux vecteurs
+struct VectorCompare {
+    bool operator()(const std::vector<int>& a, const std::vector<int>& b) const {
+        return a < b; // Ordre lexicographique
+    }
+};
+
+int modeApprentissage(){
+    // Initial delimiter value
+    int delimiterCounter = 1;
+    std::string trainingFolder = "training";
+
+    // Check if the folder exists
+    if (!fs::exists(trainingFolder)) {
+        std::cerr << "Error: Folder " << trainingFolder << " does not exist." << std::endl;
+        return -1;  // Return a non-zero value to indicate an error
+    }
+
+    // Declare fnMap inside the function to make it local
+    std::map<std::string, int> fnMap;
+
+
+       for (const auto& entry : fs::directory_iterator(trainingFolder)) {
+        if (!entry.is_directory()) {
+            continue;
+        }
+
+        std::string folderPath = entry.path().string();
+        std::cout << "Processing folder: " << folderPath << std::endl;
+
+        int delimiterCounter = 1;
+        std::vector<std::string> filenames;
+
+        // Collect all JSON files in the folder
+        for (const auto& fileEntry : fs::directory_iterator(folderPath)) {
+            if (fileEntry.is_regular_file() && fileEntry.path().extension() == ".json") {
+                filenames.push_back(fileEntry.path().string());
+            }
+        }
+
+    //std::vector<std::string> filenamesUnpacked = {"traces/bootcfg.exe.json","traces/cipher.exe.json",
+    //"traces/ping.exe.json","traces/shutdown.exe.json","/Users/eljc3201/Downloads/max_repeats/strmat/traces/msg.exe.json"};
+  
+      // Utilisation d'un dictionnaire commun pour packés et non packés
+    std::vector<int> delimitorsPacked, delimitorsUnpacked;
+
+    std::vector<int> newTrace = processFiles(folderPath,filenames, delimiterCounter, fnMap, delimitorsPacked);
+
+    delimiterCounter = 1; // Réinitialiser pour les traces non packées
+    //std::vector<int> traceUnpacked = processFiles(filenamesUnpacked, delimiterCounter, fnMap, delimitorsUnpacked);
+
+
+    json jsonData = fnMap;
+    string filename = "mapFn.json";
+    // Write JSON data to the specified file
+    std::ofstream outFile12(filename);
+    if (outFile12.is_open()) {
+        outFile12 << jsonData.dump(4); // Pretty-print with 4 spaces indentation
+        outFile12.close();
+        std::cout << "fnMap saved to " << filename << " successfully." << std::endl;
+    } else {
+        std::cerr << "Error: Unable to open file " << filename << " for writing." << std::endl;
+    }
+   
+
+
+
+//   do {
+//         std::vector<int> oldTrace = newTrace;
+
+//         // Trouver les répétitions primitives
+//         std::vector<Triplet> primitive_repeats = find_primitive_repests(newTrace);
+
+//         // Extraire les longueurs uniques
+//         std::vector<int> unique_lengths;
+//         for (const auto& triplet : primitive_repeats) {
+//             unique_lengths.push_back(triplet.length);
+//         }
+
+//         // Supprimer les doublons et trier
+//         std::sort(unique_lengths.begin(), unique_lengths.end());
+//         unique_lengths.erase(std::unique(unique_lengths.begin(), unique_lengths.end()), unique_lengths.end());
+
+//         // Parcourir les longueurs triées
+//         for (int length : unique_lengths) {
+//             // Filtrer les triplets de la longueur actuelle
+//             std::vector<Triplet> triplets_of_current_length;
+//             for (const auto& triplet : primitive_repeats) {
+//                 if (triplet.length == length) {
+//                     triplets_of_current_length.push_back(triplet);
+//                 }
+//             }
+
+//             // Remplacer les répétitions pour la longueur actuelle
+//             newTrace = replaceTandemRepeats(newTrace, triplets_of_current_length);
+//         }
+
+//         // Si la trace n'a pas changé, arrêter la boucle
+//         if (newTrace == oldTrace) {
+//             break;
+//         }
+
+//     } while (true);
+
+
+
+
+
+    // Affichage de la trace résultante
+    std::cout << "Trace finale: " << std::endl;
+    std::cout << "Taille: " << newTrace.size() << std::endl;
+
+    for (const auto& elem : newTrace) {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+
+
+   
+    int numfiles = filenames.size();
+    std::vector<int> delimitors;
+    for(int i =1; i<= numfiles;i++){
+        std::string delim_key = "DELIM_"+folderPath+ std::to_string(i);
+        auto it = fnMap.find(delim_key);
+        if(it!= fnMap.end()){
+            delimitors.push_back(it->second);
+        }
+    }
+
+    vector<int> delimiterIndices = getDelimiterIndices(newTrace,delimitors);
+    std::vector<std::tuple<std::vector<int>, std::vector<int>>> maximal_repeats_with_indices = get_maximal_repeats1(newTrace,100,3);
+
+
+
+
+    std::vector<vector<int>> filtredMaximalRepeats = filterSuperMaximalsInMultipleTraces(maximal_repeats_with_indices,delimiterIndices);
+
+    // Crée une map inverse pour la recherche
+    std::unordered_map<int, std::string> inverseMap = invertMap(fnMap);
+
+    // Conversion en chaînes de caractères
+    std::vector<std::vector<std::string>> maximalrepeatsstring = convertToStrings(filtredMaximalRepeats, inverseMap);
+
+    // Affichage du résultat
+    for (const auto& repeat : maximalrepeatsstring) {
+        for (const auto& val : repeat) {
+            std::cout << val << " ";
+        }
+        std::cout << std::endl;
+    }
+    json j2 = maximalrepeatsstring;
+    std::ofstream outFile2(folderPath+"_near_supermaximals_string.json");
+    outFile2 << j2.dump(4);
+    outFile2.close();
+
+
+    // Conversion en JSON
+    json j1 = filtredMaximalRepeats;
+    // Écrire le JSON dans un fichier
+    std::ofstream outFile1(folderPath+"_near_supermaximals.json");
+    outFile1 << j1.dump(4);
+    outFile1.close();}
+
+
+    return 0;
+}
+
+
+
+std::string removeInvalidUTF8(const std::string& str) {
+    std::string result;
+    for (size_t i = 0; i < str.size(); ++i) {
+        // Vérifier si le caractère est valide UTF-8
+        if ((str[i] & 0x80) == 0) {
+            // Caractère ASCII, ajouter tel quel
+            result += str[i];
+        } else {
+            // Ignorer les caractères invalides
+            // Tu peux aussi choisir d'ajouter un remplacement comme '?'
+        }
+    }
+    return result;
+}
+
+int modeTest() {
+    std::string inputDirectory = "../trace3";
+    std::string outputDirectory = "../results";
+
+    // Vérifier ou créer le dossier de sortie
+    if (!fs::exists(outputDirectory)) {
+        fs::create_directory(outputDirectory);
+        std::cout << "Dossier de sortie créé : " << outputDirectory << std::endl;
+    } else {
+        std::cout << "Dossier de sortie déjà existant : " << outputDirectory << std::endl;
+    }
+
+    // Parcourir chaque fichier JSON dans le dossier des traces
+    for (const auto& entry : fs::directory_iterator(inputDirectory)) {
+        if (entry.path().extension() == ".json") {
+            std::string filename = entry.path().string();
+            std::cout << "Traitement du fichier : " << filename << std::endl;
+
+            // Lecture du fichier JSON
+            std::ifstream file(filename, std::ios::binary);
+            if (!file.is_open()) {
+                std::cerr << "Erreur : Impossible d'ouvrir le fichier " << filename << std::endl;
+                continue;
+            }
+
+            // Lire le contenu du fichier JSON
+            std::string line;
+            std::vector<json> lines;
+            bool utf8Error = false;  // Flag pour détecter une erreur UTF-8
+            while (std::getline(file, line)) {
+                try {
+                   line = removeInvalidUTF8(line);  // Supprimer les caractères invalides
+                    if (!line.empty()) {
+                        json jsonLine = json::parse(line);
+                        lines.push_back(jsonLine);
+                    }
+                } catch (const json::parse_error& e) {
+                    std::cerr << "Erreur : Échec de l'analyse de la ligne JSON : " << line << " (" << e.what() << ")" << std::endl;
+                    utf8Error = true;
+                    break;  // Si erreur UTF-8, on arrête immédiatement pour ce fichier
+                }
+            }
+            file.close();
+
+            //Si une erreur UTF-8 a été détectée, ignorer ce fichier
+            // if (utf8Error) {
+            //     std::cerr << "Fichier ignoré en raison d'une erreur UTF-8 : " << filename << std::endl;
+            //     continue;
+            // }
+
+            std::cout << "Nombre de lignes JSON lues : " << lines.size() << std::endl;
+
+            // Traiter les données JSON
+            std::vector<Node> nodes = Node::build_graph(lines);
+            std::vector<std::string> functionNames = extractFunctionNames(nodes);
+            std::cout << "Noms de fonctions extraites : " << functionNames.size() << " fonctions trouvées." << std::endl;
+
+            // Charger ou créer le mapping des appels système
+            std::map<std::string, int> mapFn;
+            if (std::filesystem::exists("mapFn.json")) {
+                std::ifstream mapFile("mapFn.json");
+                if (mapFile.is_open()) {
+                    json j;
+                    mapFile >> j;
+                    for (auto it = j.begin(); it != j.end(); ++it) {
+                        mapFn[it.key()] = it.value();
+                    }
+                    mapFile.close();
+                }
+            }
+            std::cout << "Taille initiale du mapping des appels système : " << mapFn.size() << std::endl;
+
+            std::vector<int> numCallSystems = replaceSystemCalls(functionNames, mapFn);
+            saveMapFn("mapFn.json", mapFn);
+
+            std::vector<int> newTrace = numCallSystems;
+
+            // Conversion en JSON
+            json resultJson = newTrace;
+
+            // Générer le nom du fichier de sortie
+            std::string outputFilename = outputDirectory + "/" + entry.path().stem().string() + "_converted.json";
+
+            // Écrire dans le fichier de sortie
+            std::ofstream outFile(outputFilename);
+            if (outFile.is_open()) {
+                outFile << resultJson.dump(4);
+                outFile.close();
+                std::cout << "Fichier converti et enregistré : " << outputFilename << std::endl;
+            } else {
+                std::cerr << "Erreur : Impossible d'écrire dans le fichier " << outputFilename << std::endl;
+            }
+        }
+    }
+    return 0;
+}
+int main(int argc, char *argv[]) {
+
+    std::string mode = argv[1];
+
+    if(mode == "-a"){
+        int app = modeApprentissage();
+    }else if(mode=="-t"){
+        int app = modeTest();
+    }
+   
     return 0;
 }

@@ -9,8 +9,8 @@ CXXFLAGS = -std=c++17 -Wall -g
 
 # Fichiers sources et objets
 C_SRCS = stree_strmat.c stree_ukkonen.c repeats_supermax.c repeats_primitives.c
-CPP_SRCS = main12345.cpp
-OBJS = stree_strmat.o stree_ukkonen.o repeats_supermax.o repeats_primitives.o main12345.o
+CPP_SRCS = main.cpp
+OBJS = stree_strmat.o stree_ukkonen.o repeats_supermax.o repeats_primitives.o main.o
 
 # Règle pour générer l'exécutable final
 $(TARGET): $(OBJS)
@@ -29,8 +29,8 @@ repeats_supermax.o: repeats_supermax.c
 repeats_primitives.o: repeats_primitives.c
 	$(CC) $(CFLAGS) -c repeats_primitives.c -o repeats_primitives.o
 
-main12345.o: main12345.cpp
-	$(CXX) $(CXXFLAGS) -c main12345.cpp -o main12345.o
+main.o: main.cpp
+	$(CXX) $(CXXFLAGS) -c main.cpp -o main.o
 
 # Règle de nettoyage pour supprimer les fichiers intermédiaires et l'exécutable
 clean:
