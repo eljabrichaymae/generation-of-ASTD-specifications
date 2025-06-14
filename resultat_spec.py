@@ -43,7 +43,7 @@ def process_files(directory, output_csv="results.csv", misclassified_csv="miscla
                 print(f"Fichier function_names.txt non créé pour {filename}")
                 packer_name = "unpacked"
             else:
-                flowastd_command = "./flowastd -i function_names.txt"
+                flowastd_command = "./flow_patron_133_0 -i function_names.txt"
                 result = subprocess.run(flowastd_command, shell=True, 
                                       capture_output=True, text=True)
                 
@@ -94,6 +94,6 @@ print("\nRapport de classification:")
 print(pd.crosstab(y_true, y_pred, rownames=['Réel'], colnames=['Prédit'], margins=True))
 
 # Afficher les fichiers mal classés
-misclassified = pd.read_csv("misclassified.csv")
+misclassified = pd.read_csv("results_output/misclassified.csv")
 print("\nFichiers mal classés:")
 print(misclassified[['filename', 'y_true', 'y_pred']])
