@@ -53,13 +53,13 @@ echo "===================="
 echo "Génération des features"
 echo "===================="
 
-python3 approximate_matching.py
+python3 feature_generation.py
 
 echo "===================="
 echo "Génération de la spécification"
 echo "===================="
 
-python3 randomTree.py
+python3 decision_tree_translation.py
 
 echo "===================="
 echo "Génération du code C++"
