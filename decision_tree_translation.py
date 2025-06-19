@@ -409,7 +409,7 @@ def extract_rules_for_class(tree,classes):
         if tree_.feature[node] != _tree.TREE_UNDEFINED:
             feature = feature_names[tree_.feature[node]]
             threshold = tree_.threshold[node]
-            k = math.ceil(float(threshold))
+            k = math.floor(float(threshold)) + 1
             pattern = patrons_data.get(feature, [])[:k]
             transitions = []
             kmp_automaton = constructDFA(pattern,set(pattern))
