@@ -1,74 +1,72 @@
 #!/bin/bash
-
-#!/bin/bash
-set -e  # Arrêter le script si une commande échoue
+set -e  # Stop the script if a command fails
 
 echo "===================="
-echo "Extraction de fichiers"
+echo "Extracting files"
 echo "===================="
 
 if [[ -f trace3.zip ]]; then
     unzip -x trace3.zip "__MACOSX/*"
 else
-    echo "Erreur : trace3.zip introuvable."
+    echo "Error: trace3.zip not found."
     exit 1
 fi
 
 echo "===================="
-echo "Accès au dossier du projet"
+echo "Accessing the project folder"
 echo "===================="
 
 if [[ -d extraction_of_patterns ]]; then
     cd extraction_of_patterns
 else
-    echo "Erreur : dossier 'extraction_of_patterns' introuvable."
+    echo "Error: 'extraction_of_patterns' folder not found."
     exit 1
 fi
 
 echo "===================="
-echo "Compilation en cours..."
+echo "Compiling..."
 echo "===================="
 
 make
 
 echo "===================="
-echo "Exécution : ./programme -a"
+echo "Running: ./programme -a"
 echo "===================="
 
 ./programme -a
 
 echo "===================="
-echo "Exécution : ./programme -t"
+echo "Running: ./programme -t"
 echo "===================="
 
 ./programme -t
 
 echo "===================="
-echo "Retour au dossier parent"
+echo "Returning to parent directory"
 echo "===================="
 
 cd ..
 
 echo "===================="
-echo "Génération des features"
+echo "Generating features"
 echo "===================="
 
 python3 feature_generation.py
 
 echo "===================="
-echo "Génération de la spécification"
+echo "Generating the specification"
 echo "===================="
 
 python3 decision_tree_translation.py
 
 echo "===================="
-echo "Génération du code C++"
+echo "Generating C++ code"
 echo "===================="
 
 java -jar castd.jar -s model.json -o .
 
 echo "===================="
-echo "Génération du code C++"
+echo "Classification result using the ASTD specification"
 echo "===================="
 
 python3 resultat_spec.py
