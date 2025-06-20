@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
-def process_files(directory, output_csv="results.csv", misclassified_csv="misclassified.csv"):
+def process_files(directory, output_csv="results.csv", misclassified_csv="results_output/misclassified_samples_usingASTD.csv"):
     # Ouvrir les fichiers CSV
     with open(output_csv, mode="w", newline="") as file, \
          open(misclassified_csv, mode="w", newline="") as mis_file:
@@ -77,23 +77,23 @@ df = pd.read_csv("results.csv")
 y_true = df["y_true"]
 y_pred = df["y_pred"]
 
-plt.figure(figsize=(10, 8))
+
 conf_matrix = confusion_matrix(y_true, y_pred, labels=sorted(y_true.unique()))
-sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
+plt.figure(figsize=(8, 8))
+sns.heatmap(conf_matrix, annot=True, fmt="d", 
             xticklabels=sorted(y_true.unique()),
             yticklabels=sorted(y_true.unique()))
-plt.xlabel("Prédit")
-plt.ylabel("Réel")
-plt.title("Matrice de Confusion")
-plt.tight_layout()
-plt.savefig("confusion_matrix.png", dpi=300)
-plt.show()
+plt.ylabel("Actual")
+plt.xlabel("Predicted")
 
+#plt.tight_layout()
+plt.savefig("confusion_matrix.png")
+plt.show()
 # Générer un rapport détaillé
 print("\nRapport de classification:")
 print(pd.crosstab(y_true, y_pred, rownames=['Réel'], colnames=['Prédit'], margins=True))
 
 # Afficher les fichiers mal classés
-misclassified = pd.read_csv("results_output/misclassified.csv")
+misclassified = pd.read_csv("results_output/misclassified_samples_usingASTD.csv")
 print("\nFichiers mal classés:")
 print(misclassified[['filename', 'y_true', 'y_pred']])

@@ -623,7 +623,7 @@ misclassified_samples['predicted_label'] = y_pred_full[misclassified_indices]
 misclassified_samples = misclassified_samples[['filename', 'true_label', 'predicted_label']]
 print("\n🔍 Exemples mal classés :")
 print(misclassified_samples.head())
-misclassified_samples.to_csv("results_output/misclassified_samples.csv", index=False)
+misclassified_samples.to_csv("results_output/misclassified_samples_usingDT.csv", index=False)
 print("\n💾 Misclassifications sauvegardées dans 'results_output/misclassified_samples.csv'")
 
 
