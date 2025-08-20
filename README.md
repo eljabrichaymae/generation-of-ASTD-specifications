@@ -1,2 +1,24 @@
 # Packer Detection and Classification using ASTDs
 The widespread use of packers in malware obfuscation presents a major challenge for both static and dynamic analysis techniques. This paper introduces a novel behavior-based method for detecting and classifying packed binaries through the analysis of system call sequences. Structural patterns, such as super maximal repeats, are extracted from execution traces. Using suffix trees for efficient pattern discovery and the Z-similarity to compute similarity scores, we construct feature vectors that represent each . These features are then used to train a decision tree classifier, which is subsequently transformed into an equivalent specification in the form of an Algebraic State Transition Diagram (ASTD). This conversion allows each classification rule to be expressed as a combination of automata, enhancing explainability and enabling continuous detection of packers.
+
+
+## Requirements
+
+To run this project, you need the following Python packages:
+
+- `scikit-learn`
+- `pandas`
+- `numpy`
+- `seaborn`
+
+You also need the following system requirement:
+
+- `make` (for compiling the C++ code)
+
+## Running the Project
+
+To execute the full workflow, run the following command from the project root:
+
+```bash
+./execution.sh
+```
