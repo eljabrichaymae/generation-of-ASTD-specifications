@@ -460,15 +460,21 @@ bool isValidUTF8(unsigned char c) {
     return (c >= 32 && c <= 126) || (c >= 160); // Garde les caractères imprimables
 }
 
-std::string removeInvalidUTF81(const std::string& input) {
-    std::string output;
-    for (unsigned char c : input) {
-        if (isValidUTF8(c)) {
-            output += c;
+std::string removeInvalidUTF8(const std::string& str) {
+    std::string result;
+    for (size_t i = 0; i < str.size(); ++i) {
+        // Vérifier si le caractère est valide UTF-8
+        if ((str[i] & 0x80) == 0) {
+            // Caractère ASCII, ajouter tel quel
+            result += str[i];
+        } else {
+            // Ignorer les caractères invalides
+            // Tu peux aussi choisir d'ajouter un remplacement comme '?'
         }
     }
-    return output;
+    return result;
 }
+
 
 
 
@@ -488,7 +494,8 @@ std::vector<int> processFiles(string folderPath,const std::vector<std::string>& 
         std::string line;
         std::vector<json> lines;
         while (std::getline(file, line)) {
-            line = removeInvalidUTF81(line); 
+            
+            line = removeInvalidUTF8(line);
             if (!line.empty()) {
                 try {
                     json jsonLine = json::parse(line);
@@ -550,7 +557,7 @@ struct VectorCompare {
 int modeApprentissage(){
     // Initial delimiter value
     int delimiterCounter = 1;
-    std::string trainingFolder = "training";
+    std::string trainingFolder = "../data";
 
     // Check if the folder exists
     if (!fs::exists(trainingFolder)) {
@@ -709,115 +716,96 @@ int modeApprentissage(){
 
 
 
-std::string removeInvalidUTF8(const std::string& str) {
-    std::string result;
-    for (size_t i = 0; i < str.size(); ++i) {
-        // Vérifier si le caractère est valide UTF-8
-        if ((str[i] & 0x80) == 0) {
-            // Caractère ASCII, ajouter tel quel
-            result += str[i];
-        } else {
-            // Ignorer les caractères invalides
-            // Tu peux aussi choisir d'ajouter un remplacement comme '?'
-        }
-    }
-    return result;
-}
+
 
 int modeTest() {
-    std::string inputDirectory = "../trace3";
-    std::string outputDirectory = "../results";
+   std::vector<std::string> inputDirectories = {"/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/training",
+                                             "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/test"};
 
-    // Vérifier ou créer le dossier de sortie
-    if (!fs::exists(outputDirectory)) {
-        fs::create_directory(outputDirectory);
-        std::cout << "Dossier de sortie créé : " << outputDirectory << std::endl;
-    } else {
-        std::cout << "Dossier de sortie déjà existant : " << outputDirectory << std::endl;
+    std::string outputRoot = "../results";
+
+    // Créer le dossier principal "results" si nécessaire
+    if (!fs::exists(outputRoot)) {
+        fs::create_directory(outputRoot);
+        std::cout << "Dossier de sortie créé : " << outputRoot << std::endl;
     }
 
-    // Parcourir chaque fichier JSON dans le dossier des traces
-    for (const auto& entry : fs::directory_iterator(inputDirectory)) {
-        if (entry.path().extension() == ".json") {
-            std::string filename = entry.path().string();
-            std::cout << "Traitement du fichier : " << filename << std::endl;
-
-            // Lecture du fichier JSON
-            std::ifstream file(filename, std::ios::binary);
-            if (!file.is_open()) {
-                std::cerr << "Erreur : Impossible d'ouvrir le fichier " << filename << std::endl;
-                continue;
+    // Charger le mapping global mapFn.json
+    std::map<std::string, int> mapFn;
+    if (fs::exists("mapFn.json")) {
+        std::ifstream mapFile("mapFn.json");
+        if (mapFile.is_open()) {
+            json j;
+            mapFile >> j;
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                mapFn[it.key()] = it.value();
             }
+            mapFile.close();
+        }
+    }
+    std::cout << "Taille initiale du mapping global mapFn : " << mapFn.size() << std::endl;
 
-            // Lire le contenu du fichier JSON
-            std::string line;
-            std::vector<json> lines;
-            bool utf8Error = false;  // Flag pour détecter une erreur UTF-8
-            while (std::getline(file, line)) {
-                try {
-                   line = removeInvalidUTF8(line);  // Supprimer les caractères invalides
-                    if (!line.empty()) {
-                        json jsonLine = json::parse(line);
-                        lines.push_back(jsonLine);
-                    }
-                } catch (const json::parse_error& e) {
-                    std::cerr << "Erreur : Échec de l'analyse de la ligne JSON : " << line << " (" << e.what() << ")" << std::endl;
-                    utf8Error = true;
-                    break;  // Si erreur UTF-8, on arrête immédiatement pour ce fichier
+    for (const auto& inputDirectory : inputDirectories) {
+        // Récupérer le nom du dossier de base ("training" ou "test")
+        std::string folderName = fs::path(inputDirectory).filename().string();
+        std::string outputDirectory = outputRoot + "/" + folderName;
+
+        if (!fs::exists(outputDirectory)) {
+            fs::create_directory(outputDirectory);
+            std::cout << "Dossier de sortie créé : " << outputDirectory << std::endl;
+        }
+
+        for (const auto& entry : fs::directory_iterator(inputDirectory)) {
+            if (entry.path().extension() == ".json") {
+                std::string filename = entry.path().string();
+                std::cout << "Traitement du fichier : " << filename << std::endl;
+
+                std::ifstream file(filename, std::ios::binary);
+                if (!file.is_open()) {
+                    std::cerr << "Erreur : Impossible d'ouvrir le fichier " << filename << std::endl;
+                    continue;
                 }
-            }
-            file.close();
 
-            //Si une erreur UTF-8 a été détectée, ignorer ce fichier
-            // if (utf8Error) {
-            //     std::cerr << "Fichier ignoré en raison d'une erreur UTF-8 : " << filename << std::endl;
-            //     continue;
-            // }
-
-            std::cout << "Nombre de lignes JSON lues : " << lines.size() << std::endl;
-
-            // Traiter les données JSON
-            std::vector<Node> nodes = Node::build_graph(lines);
-            std::vector<std::string> functionNames = extractFunctionNames(nodes);
-            std::cout << "Noms de fonctions extraites : " << functionNames.size() << " fonctions trouvées." << std::endl;
-
-            // Charger ou créer le mapping des appels système
-            std::map<std::string, int> mapFn;
-            if (std::filesystem::exists("mapFn.json")) {
-                std::ifstream mapFile("mapFn.json");
-                if (mapFile.is_open()) {
-                    json j;
-                    mapFile >> j;
-                    for (auto it = j.begin(); it != j.end(); ++it) {
-                        mapFn[it.key()] = it.value();
+                std::string line;
+                std::vector<json> lines;
+                while (std::getline(file, line)) {
+                    try {
+                        line = removeInvalidUTF8(line);
+                        if (!line.empty()) {
+                            lines.push_back(json::parse(line));
+                        }
+                    } catch (const json::parse_error& e) {
+                        std::cerr << "Erreur parsing JSON : " << line << " (" << e.what() << ")" << std::endl;
+                        break;
                     }
-                    mapFile.close();
                 }
-            }
-            std::cout << "Taille initiale du mapping des appels système : " << mapFn.size() << std::endl;
+                file.close();
 
-            std::vector<int> numCallSystems = replaceSystemCalls(functionNames, mapFn);
-            saveMapFn("mapFn.json", mapFn);
+                std::vector<Node> nodes = Node::build_graph(lines);
+                std::vector<std::string> functionNames = extractFunctionNames(nodes);
 
-            std::vector<int> newTrace = numCallSystems;
+                std::vector<int> numCallSystems = replaceSystemCalls(functionNames, mapFn);
 
-            // Conversion en JSON
-            json resultJson = newTrace;
+                // Nom du fichier de sortie dans le sous-dossier results/training ou results/test
+                std::string outputFilename = outputDirectory + "/" + entry.path().stem().string() + "_converted.json";
 
-            // Générer le nom du fichier de sortie
-            std::string outputFilename = outputDirectory + "/" + entry.path().stem().string() + "_converted.json";
-
-            // Écrire dans le fichier de sortie
-            std::ofstream outFile(outputFilename);
-            if (outFile.is_open()) {
-                outFile << resultJson.dump(4);
-                outFile.close();
-                std::cout << "Fichier converti et enregistré : " << outputFilename << std::endl;
-            } else {
-                std::cerr << "Erreur : Impossible d'écrire dans le fichier " << outputFilename << std::endl;
+                std::ofstream outFile(outputFilename);
+                if (outFile.is_open()) {
+                    json resultJson = numCallSystems;
+                    outFile << resultJson.dump(4);
+                    outFile.close();
+                    std::cout << "Fichier converti et enregistré : " << outputFilename << std::endl;
+                } else {
+                    std::cerr << "Erreur : Impossible d'écrire dans le fichier " << outputFilename << std::endl;
+                }
             }
         }
     }
+
+    // Sauvegarder le mapping global à la fin
+    saveMapFn("mapFn.json", mapFn);
+    std::cout << "Mapping global mapFn sauvegardé avec " << mapFn.size() << " entrées." << std::endl;
+
     return 0;
 }
 int main(int argc, char *argv[]) {

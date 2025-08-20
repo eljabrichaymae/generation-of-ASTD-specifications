@@ -48,80 +48,59 @@ def z_algorithm(p, t):
     return score
 
 
-# Dossiers d'entrée et de sortie
-results_directory = "results"
-training_directory = "extraction_of_patterns/training"
-output_csv = "results_output/z_array_combined"
+
+# --- Dossiers ---
+results_root = "results"
+training_results_dir = os.path.join(results_root, "training")
+test_results_dir = os.path.join(results_root, "test")
+training_directory = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/data"  # motifs
 patterns_json_output = "results_output/patterns_with_ids.json"
 map_fn_path = "extraction_of_patterns/mapFn.json"
 
-
-
-# Charger le fichier de mappage JSON
-with open(map_fn_path, 'r') as map_file:
-    map_fn = json.load(map_file)  # Chargement du dictionnaire de mapping
-
-# Inverser le dictionnaire pour obtenir un mapping {numéro: fonction}
+# --- Charger mapFn ---
+with open(map_fn_path, 'r') as f:
+    map_fn = json.load(f)
 inverse_map_fn = {v: k for k, v in map_fn.items()}
 
-
-
-
-# Regrouper tous les patrons dans une liste commune
+# --- Charger tous les motifs depuis training_directory ---
 all_patterns = []
 for file_path in glob.glob(f"{training_directory}/*_near_supermaximals.json"):
     print(f"Chargement des motifs à partir de : {file_path}")
     with open(file_path, 'r') as file:
         patterns = json.load(file)
         all_patterns.extend(patterns)
-
 print(f"Nombre total de patrons chargés : {len(all_patterns)}")
 
-
-
-# Générer une version des motifs avec les noms équivalents (sans modifier les données utilisées pour le calcul)
+# --- Sauvegarder motifs avec équivalents ---
 patterns_with_equivalents = {
-    f"Patron_{i+1}": [inverse_map_fn.get(value, value) for value in pattern]
+    f"Patron_{i+1}": [inverse_map_fn.get(v, v) for v in pattern]
     for i, pattern in enumerate(all_patterns)
 }
-
-# Sauvegarde des motifs convertis dans un fichier JSON
 os.makedirs(os.path.dirname(patterns_json_output), exist_ok=True)
 with open(patterns_json_output, 'w') as json_file:
     json.dump(patterns_with_equivalents, json_file, indent=4)
 
+# --- Fonction pour générer CSV ---
+def generate_csv(subdir, output_csv_path):
+    os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
+    with open(output_csv_path, 'w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        headers = ["Fichier"] + [f"Patron_{i+1}" for i in range(len(all_patterns))] + ["label"]
+        csv_writer.writerow(headers)
 
-# Préparer le fichier CSV de sortie
-os.makedirs(os.path.dirname(output_csv+".csv"), exist_ok=True)
-with open(output_csv+".csv", mode='w', newline='') as csv_file:
-    csv_writer = csv.writer(csv_file)
+        for target_file_path in glob.glob(f"{subdir}/*.json"):
+            file_name = os.path.basename(target_file_path)
+            ground_truth = re.findall(r'(upx|telock|petite|molebox|mew|amber|bero|yoda)', file_name.lower())
+            label = ground_truth[0] if ground_truth else "unpacked"
 
-    # Écrire les en-têtes (colonnes pour chaque motif)
-    headers = ["Fichier"] + [f"Patron_{i+1}" for i in range(len(all_patterns))]+["label"]
-    csv_writer.writerow(headers)
+            with open(target_file_path, 'r') as f:
+                sequence = json.load(f)
 
-    # Calculer les scores pour chaque fichier de résultats
-    for target_file_path in glob.glob(f"{results_directory}/*.json"):
-    #if target_file_path.endswith("_near_supermaximals.json"):
-        #    continue  # Ignorer les fichiers de motifs eux-mêmes
-        
-        file_name = os.path.basename(target_file_path)
-        ground_truth = re.findall(r'(upx|telock|petite|molebox|mew|amber|bero|yoda)', file_name.lower())
-        #ground_truth = re.findall(packer, file_name.lower())
-        label = ground_truth[0] if ground_truth else "unpacked"
+            similarity_scores = [z_algorithm(pat, sequence) for pat in all_patterns]
+            row = [file_name] + similarity_scores + [label]
+            csv_writer.writerow(row)
+    print(f"CSV généré : {output_csv_path}")
 
-        # Charger la séquence cible
-        with open(target_file_path, 'r') as target_file:
-            sequence = json.load(target_file)
-        #print(sequence)
-        # Calculer les scores de similarité pour tous les patrons
-        similarity_scores = []
-        for pat in all_patterns:
-            score = z_algorithm(pat, sequence)
-            similarity_scores.append(score)
-
-        # Écrire les résultats dans le fichier CSV
-        row = [os.path.basename(target_file_path)] + similarity_scores + [label]
-        csv_writer.writerow(row)
-
-print(f"Les scores Z combinés ont été enregistrés dans {output_csv}.csv.")
+# --- Générer CSV pour training et test ---
+generate_csv(training_results_dir, "results_output/z_array_training.csv")
+generate_csv(test_results_dir, "results_output/z_array_test.csv")

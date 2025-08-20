@@ -2,15 +2,39 @@
 set -e  # Stop the script if a command fails
 
 echo "===================="
+echo "Cleaning old folders"
+echo "===================="
+
+# Supprimer les dossiers data et results s'ils existent
+rm -rf data results test training __MACOSX
+
+echo "===================="
+echo "Removing old flow_patron executable"
+echo "===================="
+
+
+rm -f flow_patron*
+
+echo "===================="
 echo "Extracting files"
 echo "===================="
 
 if [[ -f trace3.zip ]]; then
-    unzip -x trace3.zip "__MACOSX/*"
+    unzip -x trace3.zip 
 else
     echo "Error: trace3.zip not found."
     exit 1
 fi
+
+echo "===================="
+echo "Creating training and test data"
+echo "===================="
+python3 create_data.py
+
+echo "===================="
+echo "Grouping Training Files by packer"
+echo "===================="
+python3 create_files_packer.py
 
 echo "===================="
 echo "Accessing the project folder"
@@ -22,6 +46,8 @@ else
     echo "Error: 'extraction_of_patterns' folder not found."
     exit 1
 fi
+
+
 
 echo "===================="
 echo "Compiling..."
@@ -63,13 +89,10 @@ echo "===================="
 echo "Generating C++ code"
 echo "===================="
 
-java -jar castd.jar -s model.json -o .
+java -jar castd.jar -s ./results_output/model.json -o .
 
 echo "===================="
 echo "Classification result using the ASTD specification"
 echo "===================="
 
 python3 resultat_spec.py
-
-
-

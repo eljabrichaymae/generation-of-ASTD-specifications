@@ -7,8 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.tree import plot_tree
 import numpy as np
-import te2rules
-from te2rules.explainer import ModelExplainer
+
 from sklearn.tree import export_text
 from sklearn.tree import _tree
 import glob
@@ -304,7 +303,7 @@ def generate_ASTD_automaton(pattern_name,transitions,k,pattern_list):
                                                 ],
                                                 "when": []
                                             },
-                                            "guard": f"x==\"{trans["symbol"]}\"",
+                                            "guard": f"x==\"{trans['symbol']}\"",
                                             "action": trans.get("action", ""),
                                             "step": False,
                                             "from_final_state_only": False
@@ -522,57 +521,53 @@ def extract_rules_for_class(tree,classes):
 
 
 
-output_directory = "results_output"
 
+# ------------------- Paramètres -------------------
+TRAIN_CSV = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/results_output/z_array_training.csv"
+TEST_CSV = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/results_output/z_array_test.csv"
+SEED = 42
+TEST_SIZE = 0.2  # Ignoré ici car on utilise des CSV séparés
+RANDOM_STATES_TO_TEST = SEED
+OUTPUT_DIR = "results_output"
 
+# ------------------- Charger CSV -------------------
+train_data = pd.read_csv(TRAIN_CSV)
+test_data = pd.read_csv(TEST_CSV)
 
+feature_names = list(train_data.columns[1:-1])
+X_train = train_data.iloc[:, 1:-1]
+y_train = train_data['label']
 
+X_test = test_data.iloc[:, 1:-1]
+y_test = test_data['label']
+filenames_test = test_data.iloc[:, 0]
 
-# Charger le fichier CSV
-file_path = "results_output/z_array_combined.csv"  # Remplacez par le chemin de votre fichier CSV
-data = pd.read_csv(file_path)
-
-cols = list(data.columns)
-feature_names = cols[1:-1]
-X = data.iloc[:, 1:-1]
-y = data['label']
-filenames = data.iloc[:, 0]
-
-# Train/test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=TEST_SIZE, shuffle=True, stratify=y, random_state=RANDOM_STATES_TO_TEST
-)
-
-# ← MODIFICATION : définir la grille des paramètres pour RandomForest
+# ------------------- GridSearch Decision Tree -------------------
 param_grid = {
-  
-    'max_depth': [2, 3, 4,6,8,10],  # ← petites profondeurs
+    'max_depth': [2, 3, 4, 6, 8, 10],
     'random_state': [SEED]
 }
 
-# ← MODIFICATION : GridSearchCV
 grid_search = GridSearchCV(DecisionTreeClassifier(), param_grid,
                            cv=3, scoring='f1_weighted', n_jobs=-1, verbose=1)
 grid_search.fit(X_train, y_train)
 clf = grid_search.best_estimator_
 print("✅ Meilleurs hyperparamètres :", grid_search.best_params_)
 
-# Labels
 labels = [str(cls) for cls in clf.classes_]
 print("Labels :", labels)
 
-# Prédiction et évaluation
+# ------------------- Évaluation -------------------
 y_pred = clf.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)*100
+precision = precision_score(y_test, y_pred, average='weighted')*100
+recall = recall_score(y_test, y_pred, average='weighted')*100
+f1 = f1_score(y_test, y_pred, average='weighted')*100
 
-accuracy = accuracy_score(y_test, y_pred) * 100
-precision = precision_score(y_test, y_pred, average='weighted') * 100
-recall = recall_score(y_test, y_pred, average='weighted') * 100
-f1 = f1_score(y_test, y_pred, average='weighted') * 100
-
+print(f"Accuracy: {accuracy:.2f}")
 print(f"Precision: {precision:.2f}")
 print(f"Recall: {recall:.2f}")
 print(f"F1-Score: {f1:.2f}")
-print(f"Accuracy: {accuracy:.2f}")
 
 # Matrice de confusion
 conf_matrix = confusion_matrix(y_test, y_pred, labels=labels)
@@ -580,67 +575,48 @@ plt.figure(figsize=(8, 8))
 sns.heatmap(conf_matrix, annot=True, fmt='d', xticklabels=labels, yticklabels=labels)
 plt.ylabel("Actual")
 plt.xlabel("Predicted")
+plt.title("Confusion Matrix (Test set)")
 plt.show()
 
-# Visualiser jusqu’à 3 arbres
+# Visualiser l'arbre
 plt.figure(figsize=(15, 10))
-plot_tree(clf, filled=True, feature_names=X.columns, class_names=labels, fontsize=10)
-plt.title("Arbre de décision")
+plot_tree(clf, filled=True, feature_names=feature_names, class_names=labels, fontsize=10)
+plt.title("Decision Tree")
 plt.show()
 
-# Extraire les règles pour chaque classe
-
-
-tree_text = export_text(clf, feature_names=list(X.columns))
+# Extraire règles
+tree_text = export_text(clf, feature_names=feature_names)
 print(tree_text)
 
-# Prédiction sur tout le dataset
-y_pred_full = clf.predict(X)
-accuracy = accuracy_score(y, y_pred_full)*100
-precision = precision_score(y, y_pred_full, average='weighted')*100
-recall = recall_score(y, y_pred_full, average='weighted')*100
-f1 = f1_score(y, y_pred_full, average='weighted')*100
+automata_generator = extract_rules_for_class(clf, clf.classes_)
 
-print(f"Full Precision: {precision:.2f}")
-print(f"Full Recall: {recall:.2f}")
-print(f"Full F1-Score: {f1:.2f}")
-print(f"Full Accuracy: {accuracy:.2f}")
-
-# Matrice de confusion complète
-conf_matrix = confusion_matrix(y, y_pred_full, labels=labels)
-plt.figure(figsize=(8, 8))
-sns.heatmap(conf_matrix, annot=True, fmt='d', xticklabels=labels, yticklabels=labels)
-plt.ylabel("Actual")
-plt.xlabel("Predicted")
-plt.show()
-
-# Erreurs de classification
-misclassified_indices = np.where(y != y_pred_full)[0]
-misclassified_samples = X.iloc[misclassified_indices].copy()
-misclassified_samples['filename'] = filenames.iloc[misclassified_indices].values
-misclassified_samples['true_label'] = y.iloc[misclassified_indices].values
-misclassified_samples['predicted_label'] = y_pred_full[misclassified_indices]
-misclassified_samples = misclassified_samples[['filename', 'true_label', 'predicted_label']]
-print("\n🔍 Exemples mal classés :")
-print(misclassified_samples.head())
-misclassified_samples.to_csv("results_output/misclassified_samples_usingDT.csv", index=False)
-print("\n💾 Misclassifications sauvegardées dans 'results_output/misclassified_samples.csv'")
-
-
-automata_generator = extract_rules_for_class(clf,clf.classes_)
-#print(automata_generator)
-
-
-
+# ------------------- Sauvegarde Automate en JSON -------------------
 json_data = {
-            "target": "c++",
-            "imports": [],
-            "type_definitions": {"schemas": [], "native_types": {}, "events": []},
-            "top_level_astds": [],
-            "conf": []
-        }
-
+    "target": "c++",
+    "imports": [],
+    "type_definitions": {"schemas": [], "native_types": {}, "events": []},
+    "top_level_astds": [],
+    "conf": []
+}
 json_data["top_level_astds"].append(automata_generator)
 
-with open(f'model.json', 'w') as jsonfile:
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+with open(f'{OUTPUT_DIR}/model.json', 'w') as jsonfile:
     json.dump(json_data, jsonfile, indent=2)
+print(f"Automate sauvegardé dans {OUTPUT_DIR}/model.json")
+
+# ------------------- Sauvegarde des échantillons mal classés -------------------
+misclassified_indices = np.where(y_test != y_pred)[0]
+misclassified_samples = X_test.iloc[misclassified_indices].copy()
+misclassified_samples['filename'] = filenames_test.iloc[misclassified_indices].values
+misclassified_samples['true_label'] = y_test.iloc[misclassified_indices].values
+misclassified_samples['predicted_label'] = y_pred[misclassified_indices]
+misclassified_samples = misclassified_samples[['filename', 'true_label', 'predicted_label']]
+misclassified_samples.to_csv(f"{OUTPUT_DIR}/misclassified_samples_usingDT.csv", index=False)
+print(f"🔍 Misclassifications sauvegardées dans '{OUTPUT_DIR}/misclassified_samples_usingDT.csv'")
+
+
+# Accuracy: 98.50
+# Precision: 98.54
+# Recall: 98.50
+# F1-Score: 98.51

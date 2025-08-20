@@ -6,8 +6,21 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 
+def find_executable(search_dir=".", prefix="flow_patron"):
+    """
+    Cherche un fichier exécutable dont le nom commence par prefix
+    dans le dossier search_dir (récursivement).
+    Retourne le chemin complet ou None si non trouvé.
+    """
+    for root, dirs, files in os.walk(search_dir):
+        for f in files:
+            if f.startswith(prefix) and os.access(os.path.join(root, f), os.X_OK):
+                return os.path.join(root, f)
+    return None
+
 def process_files(directory, output_csv="results.csv", misclassified_csv="results_output/misclassified_samples_usingASTD.csv"):
     # Ouvrir les fichiers CSV
+    executable_path = find_executable(".")
     with open(output_csv, mode="w", newline="") as file, \
          open(misclassified_csv, mode="w", newline="") as mis_file:
         
@@ -43,7 +56,7 @@ def process_files(directory, output_csv="results.csv", misclassified_csv="result
                 print(f"Fichier function_names.txt non créé pour {filename}")
                 packer_name = "unpacked"
             else:
-                flowastd_command = "./flow_patron_133_0 -i function_names.txt"
+                flowastd_command = f"{executable_path} -i function_names.txt"
                 result = subprocess.run(flowastd_command, shell=True, 
                                       capture_output=True, text=True)
                 
@@ -69,7 +82,7 @@ def process_files(directory, output_csv="results.csv", misclassified_csv="result
                 print(f"Mal classé: {filename} ({original_name_prefix} -> {packer_name})")
 
 # Exécuter l'analyse
-directory_path = "./trace3"
+directory_path = "./test"
 process_files(directory_path)
 
 # Générer la matrice de confusion
