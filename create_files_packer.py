@@ -26,7 +26,7 @@ for prefix, group_files in groups.items():
     os.makedirs(group_dir, exist_ok=True)
     
     # Choisir 5 fichiers aléatoires ou moins si le groupe contient moins de 5 fichiers
-    selected_files = random.sample(group_files, min(10, len(group_files)))
+    selected_files = random.sample(group_files, min(5, len(group_files)))
     # Déplacer les fichiers vers le dossier du groupe dans data
     for f in selected_files:
         shutil.copy(os.path.join(train_dir, f), os.path.join(group_dir, f))
