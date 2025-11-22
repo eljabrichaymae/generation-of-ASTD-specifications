@@ -50,10 +50,11 @@ def z_algorithm(p, t):
 
 
 # --- Dossiers ---
+# --- Dossiers ---
 results_root = "results"
-training_results_dir = os.path.join(results_root, "training")
-test_results_dir = os.path.join(results_root, "test")
-training_directory = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/data"  # motifs
+training_results_dir = "training"
+test_results_dir = "test"
+training_directory = "data"  # motifs
 patterns_json_output = "results_output/patterns_with_ids.json"
 map_fn_path = "extraction_of_patterns/mapFn.json"
 
@@ -93,10 +94,32 @@ def generate_csv(subdir, output_csv_path):
             ground_truth = re.findall(r'(upx|telock|petite|molebox|mew|amber|bero|yoda)', file_name.lower())
             label = ground_truth[0] if ground_truth else "unpacked"
 
-            with open(target_file_path, 'r') as f:
-                sequence = json.load(f)
+            sequence = []
+            try:
+                with open(target_file_path, 'r', errors='ignore') as f:
+                    for line in f:
+                        try:
+                            data = json.loads(line)
+                            func_name = data.get('FunctionName') or data.get('Functionname')
+                            if func_name:
+                                # Map function name to integer using map_fn
+                                # If not found, use -1 (or skip? -1 is safer to avoid false matches)
+                                seq_val = map_fn.get(func_name, -1)
+                                sequence.append(seq_val)
+                        except json.JSONDecodeError:
+                            continue # Skip invalid lines
+            except Exception as e:
+                print(f"Error reading {target_file_path}: {e}")
+                continue
 
-            similarity_scores = [z_algorithm(pat, sequence) for pat in all_patterns]
+            if not sequence:
+                print(f"Warning: Empty sequence for {file_name}")
+                # Should we skip or write row with 0s?
+                # Writing row with 0s is probably safer than crashing or skipping
+                similarity_scores = [0] * len(all_patterns)
+            else:
+                similarity_scores = [z_algorithm(pat, sequence) for pat in all_patterns]
+            
             row = [file_name] + similarity_scores + [label]
             csv_writer.writerow(row)
     print(f"CSV généré : {output_csv_path}")

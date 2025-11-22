@@ -449,6 +449,7 @@ def extract_rules_for_class(tree,classes):
             nouvelles_transitions = ["end"] 
            
             end_automaton = generate_end_automaton(packer_name,nouveau_patron,nouvelles_transitions," && ".join(conditions))
+            # Séparer les features et la target(0, [], is_root=True)
             return end_automaton
             
     return traverse(0, [], is_root=True)
@@ -523,8 +524,8 @@ def extract_rules_for_class(tree,classes):
 
 
 # ------------------- Paramètres -------------------
-TRAIN_CSV = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/results_output/z_array_training.csv"
-TEST_CSV = "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/results_output/z_array_test.csv"
+TRAIN_CSV = "results_output/z_array_training.csv"
+TEST_CSV = "results_output/z_array_test.csv"
 SEED = 42
 TEST_SIZE = 0.2  # Ignoré ici car on utilise des CSV séparés
 RANDOM_STATES_TO_TEST = SEED
@@ -532,6 +533,10 @@ OUTPUT_DIR = "results_output"
 
 # ------------------- Charger CSV -------------------
 train_data = pd.read_csv(TRAIN_CSV)
+if 'Patron_87' in train_data.columns:
+    print(f"DEBUG: Max Patron_87 in loaded data: {train_data['Patron_87'].max()}")
+else:
+    print("DEBUG: Patron_87 not found in loaded data")
 test_data = pd.read_csv(TEST_CSV)
 
 feature_names = list(train_data.columns[1:-1])
@@ -615,8 +620,12 @@ misclassified_samples = misclassified_samples[['filename', 'true_label', 'predic
 misclassified_samples.to_csv(f"{OUTPUT_DIR}/misclassified_samples_usingDT.csv", index=False)
 print(f"🔍 Misclassifications sauvegardées dans '{OUTPUT_DIR}/misclassified_samples_usingDT.csv'")
 
+# ------------------- Sauvegarde de toutes les prédictions pour vérification -------------------
+all_predictions = X_test.copy()
+all_predictions['filename'] = filenames_test.values
+all_predictions['true_label'] = y_test.values
+all_predictions['predicted_label'] = y_pred
+all_predictions = all_predictions[['filename', 'true_label', 'predicted_label']]
+all_predictions.to_csv(f"{OUTPUT_DIR}/dt_predictions.csv", index=False)
+print(f"✅ Toutes les prédictions sauvegardées dans '{OUTPUT_DIR}/dt_predictions.csv'")
 
-# Accuracy: 98.50
-# Precision: 98.54
-# Recall: 98.50
-# F1-Score: 98.51
