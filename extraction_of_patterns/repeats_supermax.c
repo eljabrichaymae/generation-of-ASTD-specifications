@@ -410,6 +410,23 @@ static SUPERMAXIMALS compute_supermax(SUFFIX_TREE tree, STREE_NODE node,
   return list;
 }
 
+static void collect_leaves(SUFFIX_TREE tree, STREE_NODE node, int *indices, int *count) {
+    int i, pos, index;
+    int *str;
+    STREE_NODE child;
+
+    // Collect local leaves
+    for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++) {
+        indices[(*count)++] = pos;
+    }
+
+    // Recurse on children
+    child = stree_get_children(tree, node);
+    while (child != NULL) {
+        collect_leaves(tree, child, indices, count);
+        child = stree_get_next(tree, child);
+    }
+}
 
 static SUPERMAXIMALS compute_supermax1(SUFFIX_TREE tree, STREE_NODE node,
                                       int min_percent, int min_length,
@@ -530,26 +547,14 @@ static SUPERMAXIMALS compute_supermax1(SUFFIX_TREE tree, STREE_NODE node,
         }
         newnode->num_start_indices = 0;
 
-        // Collect the indices of the leaves
-        for (i = 1; stree_get_leaf(tree, node, i, &str, &pos, &index); i++) {
-            newnode->start_indices[newnode->num_start_indices++] = pos;
-            //printf("Node index: %d, pos: %d, str: %d\n", index, pos, (pos > 0 ? str[pos - 1] : -1));
-        }
-
-        // Collect the indices of the leaves in the children
-        child = stree_get_children(tree, node);
-        while (child != NULL) {
-            for (i = 1; stree_get_leaf(tree, child, i, &str, &pos, &index); i++) {
-                newnode->start_indices[newnode->num_start_indices++] = pos+1;
-                //printf("Child index: %d, pos: %d, str: %d\n", index, pos+1, (pos > 0 ? str[pos] : -1));
-            }
-            child = stree_get_next(tree, child);
-        }
+        // Collect the indices of the leaves recursively
+        collect_leaves(tree, node, newnode->start_indices, &newnode->num_start_indices);
 
         list = newnode;
     }
     return list;
 }
+
 
 
 
