@@ -719,8 +719,8 @@ int modeApprentissage(){
 
 
 int modeTest() {
-   std::vector<std::string> inputDirectories = {"/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/training",
-                                             "/Users/chaymaeeljabri/Desktop/generation-of-ASTD-specifications/test"};
+   std::vector<std::string> inputDirectories = {"../training",
+                                             "../test"};
 
     std::string outputRoot = "../results";
 
